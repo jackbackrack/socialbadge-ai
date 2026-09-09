@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "socialbadge-ai"
+version = "0.1.0"
+description = "Social Badge AI hardware design"
+requires-python = ">=3.10"
+dependencies = [
+    "jitx>=4.4,<4.5",
+    "jitxlib-standard>=4.4,<4.5",
+    "jitxlib-parts>=1.0",
+    "jitxlib-voltage-divider>=1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

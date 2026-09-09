@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+designs/
+.socket.jitx
+.jitx/
+.dependency_report.json
+.venv_sync_last
+.claude/settings.local.json
