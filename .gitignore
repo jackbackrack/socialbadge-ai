@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 *.egg-info/
-designs/
+/designs/
 .socket.jitx
 .jitx/
 .dependency_report.json
