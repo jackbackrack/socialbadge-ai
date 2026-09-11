@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name socialbadge_ai.designs.badge_main.BadgeDesign)(type KiCad)(uri "$(KIPRJMOD)/socialbadge_ai.designs.badge_main.BadgeDesign.pretty")(options "")(descr ""))
+)
