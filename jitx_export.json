@@ -1,0 +1,1427 @@
+{
+  "board_shape": {
+    "center": [
+      0.0,
+      0.0
+    ],
+    "height": 27.482328414916992,
+    "type": "rectangle",
+    "width": 27.517671585083008
+  },
+  "components": [
+    {
+      "id": "circuit.usb.j1",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          8.215642929077148,
+          9.797127723693848
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.usb.r_cc1",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          11.558486938476563,
+          4.320509910583496
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.usb.r_cc2",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          7.305110931396484,
+          4.262812614440918
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.usb.r_dp",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          8.723695755004883,
+          4.322342872619629
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.usb.r_dn",
+      "placement": {
+        "angle": 0.0,
+        "center": [
+          10.138771057128906,
+          4.350857734680176
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.charger.u1",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          -0.8352184295654297,
+          5.301150321960449
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.charger.c_vdd",
+      "placement": {
+        "angle": -1.730284384393599e-05,
+        "center": [
+          -4.0012922286987305,
+          5.912074089050293
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.charger.c_vbat",
+      "placement": {
+        "angle": 2.732981101871701e-06,
+        "center": [
+          2.335714340209961,
+          4.906325340270996
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.charger.r_prog",
+      "placement": {
+        "angle": -90.00000762939453,
+        "center": [
+          -4.46917724609375,
+          3.2725114822387695
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.charger.r_led",
+      "placement": {
+        "angle": 89.99999237060547,
+        "center": [
+          -2.185211181640625,
+          2.6411495208740234
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.charger.led",
+      "placement": {
+        "angle": 179.9999237060547,
+        "center": [
+          0.31978797912597656,
+          2.6134376525878906
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.path.d_usb",
+      "placement": {
+        "angle": 90.00000762939453,
+        "center": [
+          1.4626903533935547,
+          10.63150691986084
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.path.d_bat",
+      "placement": {
+        "angle": 179.99998474121094,
+        "center": [
+          6.857397079467773,
+          1.4726800918579102
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.ldo.u1",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          -2.559886932373047,
+          11.421154975891113
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.ldo.c_in",
+      "placement": {
+        "angle": 2.0035822672070935e-05,
+        "center": [
+          -1.0191783905029297,
+          8.361153602600098
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.ldo.c_out",
+      "placement": {
+        "angle": 2.0035822672070935e-05,
+        "center": [
+          -3.748126983642578,
+          8.361151695251465
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.mcu",
+      "placement": {
+        "angle": 0.0,
+        "center": [
+          8.311838150024414,
+          -7.054812908172607
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.flash",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          -2.402250289916992,
+          -1.3588504791259766
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.xtal",
+      "placement": {
+        "angle": -90.00000762939453,
+        "center": [
+          1.8627128601074219,
+          -11.217645645141602
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.sw_run",
+      "placement": {
+        "angle": -90.0,
+        "center": [
+          -4.755281448364258,
+          -9.945791244506836
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.sw_boot",
+      "placement": {
+        "angle": -90.0,
+        "center": [
+          -10.961795806884766,
+          -4.025081634521484
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_iovdd[0]",
+      "placement": {
+        "angle": -90.0,
+        "center": [
+          3.2299766540527344,
+          -4.780814170837402
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_iovdd[1]",
+      "placement": {
+        "angle": -90.0,
+        "center": [
+          2.94305419921875,
+          -8.452646255493164
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_iovdd[2]",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          9.306509017944336,
+          -12.388586044311523
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_iovdd[3]",
+      "placement": {
+        "angle": -3.4605691325850785e-05,
+        "center": [
+          13.077030181884766,
+          -8.339668273925781
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_iovdd[4]",
+      "placement": {
+        "angle": -3.4605691325850785e-05,
+        "center": [
+          13.078399658203125,
+          -4.77731990814209
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_iovdd[5]",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          7.214759826660156,
+          -1.3903980255126953
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_adc_avdd",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          12.951011657714844,
+          -1.7946443557739258
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_usb_vdd",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          8.765607833862305,
+          -1.4129724502563477
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_vreg_vin_bulk",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          12.277721405029297,
+          0.4579610824584961
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_vreg_vin_hf",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          10.267000198364258,
+          -1.558868408203125
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_vreg_vout",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          10.876585006713867,
+          1.2328262329101563
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_dvdd0",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          10.95376968383789,
+          -12.424415588378906
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_dvdd1",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          5.766511917114258,
+          -1.4834280014038086
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_flash_vcc",
+      "placement": {
+        "angle": -8.196226553991437e-05,
+        "center": [
+          2.999452590942383,
+          -0.30002593994140625
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_xin",
+      "placement": {
+        "angle": 89.99999237060547,
+        "center": [
+          0.6906700134277344,
+          -8.456541061401367
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_xout",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          7.878293991088867,
+          -12.304817199707031
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.r_run_pu",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          -1.2530841827392578,
+          -10.015644073486328
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.c_run_debounce",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          -1.1675796508789063,
+          -12.266475677490234
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.mcu.r_bootsel",
+      "placement": {
+        "angle": 0.0,
+        "center": [
+          -7.633232116699219,
+          -5.042146682739258
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.status.leds[0]",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          -11.744596481323242,
+          -9.223224639892578
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.status.leds[1]",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          -11.741572380065918,
+          -10.545053482055664
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.status.leds[2]",
+      "placement": {
+        "angle": 1.0017911336035468e-05,
+        "center": [
+          -11.731380462646484,
+          -11.93420124053955
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.status.r_leds[0]",
+      "placement": {
+        "angle": -90.0,
+        "center": [
+          -9.244815826416016,
+          -9.145064353942871
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.status.r_leds[1]",
+      "placement": {
+        "angle": -90.00000762939453,
+        "center": [
+          -9.24179458618164,
+          -10.572883605957031
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.status.r_leds[2]",
+      "placement": {
+        "angle": -90.00000762939453,
+        "center": [
+          -9.231602668762207,
+          -12.04407787322998
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    },
+    {
+      "id": "circuit.battery",
+      "placement": {
+        "angle": -179.99998474121094,
+        "center": [
+          -9.388072967529297,
+          8.87345027923584
+        ],
+        "flip_x": false,
+        "side": "Top"
+      }
+    }
+  ],
+  "vias": [
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.usb._Capture__link.vias[0]",
+      "net": "GND",
+      "pose": {
+        "angle": 360.0,
+        "center": [
+          7.855112075805664,
+          3.8529539108276367
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.usb._Capture__link.vias[1]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          12.54620361328125,
+          6.837126731872559
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.usb._Capture__link.vias[2]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          11.416202545166016,
+          6.427027702331543
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.usb._Capture__link.vias[3]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          12.54620361328125,
+          11.117127418518066
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.usb._Capture__link.vias[4]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          3.8862037658691406,
+          11.117127418518066
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.usb._Capture__link.vias[5]",
+      "net": "GND",
+      "pose": {
+        "angle": 360.0,
+        "center": [
+          12.108489990234375,
+          3.910649299621582
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.usb._Capture__link.vias[6]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          5.016204833984375,
+          6.427126884460449
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.usb._Capture__link.vias[7]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          3.8862037658691406,
+          6.837126731872559
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.charger._Capture__link.vias[0]",
+      "net": "GND",
+      "pose": {
+        "angle": 1080.0,
+        "center": [
+          2.872039794921875,
+          4.496464729309082
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.charger._Capture__link.vias[1]",
+      "net": "GND",
+      "pose": {
+        "angle": 540.0,
+        "center": [
+          1.2647838592529297,
+          5.538567543029785
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.charger._Capture__link.vias[2]",
+      "net": "GND",
+      "pose": {
+        "angle": 630.0,
+        "center": [
+          -5.111074447631836,
+          3.9102964401245117
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.charger._Capture__link.vias[3]",
+      "net": "GND",
+      "pose": {
+        "angle": 359.9999694824219,
+        "center": [
+          -3.9114246368408203,
+          4.902970314025879
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.charger._Capture__link.vias[4]",
+      "net": "3V3",
+      "pose": {
+        "angle": 449.9999694824219,
+        "center": [
+          -3.305767059326172,
+          2.6454124450683594
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.ldo._Capture__link.vias[0]",
+      "net": "GND",
+      "pose": {
+        "angle": 720.0,
+        "center": [
+          -3.1981258392333984,
+          7.8806657791137695
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.ldo._Capture__link.vias[1]",
+      "net": "GND",
+      "pose": {
+        "angle": 540.0,
+        "center": [
+          -0.4598865509033203,
+          11.44389820098877
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.ldo._Capture__link.vias[2]",
+      "net": "3V3",
+      "pose": {
+        "angle": 720.0,
+        "center": [
+          -3.1981258392333984,
+          8.700385093688965
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.ldo._Capture__link.vias[3]",
+      "net": "GND",
+      "pose": {
+        "angle": 720.0,
+        "center": [
+          -1.0393600463867188,
+          7.343979835510254
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[0]",
+      "net": "GND",
+      "pose": {
+        "angle": 630.0,
+        "center": [
+          2.8421192169189453,
+          -10.254612922668457
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[1]",
+      "net": "GND",
+      "pose": {
+        "angle": 719.9999389648438,
+        "center": [
+          13.220794677734375,
+          -5.097355842590332
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[2]",
+      "net": "GND",
+      "pose": {
+        "angle": 360.0,
+        "center": [
+          9.122709274291992,
+          -13.121365547180176
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[3]",
+      "net": "3V3",
+      "pose": {
+        "angle": 0.0,
+        "center": [
+          9.429067611694336,
+          -9.525623321533203
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[4]",
+      "net": "GND",
+      "pose": {
+        "angle": 89.99999237060547,
+        "center": [
+          0.43157958984375,
+          -8.714019775390625
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[5]",
+      "net": "GND",
+      "pose": {
+        "angle": -90.0,
+        "center": [
+          8.650888442993164,
+          -0.18659114837646484
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[6]",
+      "net": "GND",
+      "pose": {
+        "angle": 360.0,
+        "center": [
+          10.76997184753418,
+          -13.156087875366211
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[7]",
+      "net": "GND",
+      "pose": {
+        "angle": 360.0,
+        "center": [
+          10.919097900390625,
+          -2.4480791091918945
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[8]",
+      "net": "GND",
+      "pose": {
+        "angle": 0.0,
+        "center": [
+          8.226295471191406,
+          -9.670499801635742
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[9]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          11.917154312133789,
+          2.580143928527832
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[10]",
+      "net": "3V3",
+      "pose": {
+        "angle": 719.9999389648438,
+        "center": [
+          13.434085845947266,
+          -7.622868061065674
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[11]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          12.907577514648438,
+          -1.2638940811157227
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[12]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          -1.0276355743408203,
+          -11.708736419677734
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[13]",
+      "net": "GND",
+      "pose": {
+        "angle": 270.0,
+        "center": [
+          -6.19502067565918,
+          -12.102479934692383
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[14]",
+      "net": "3V3",
+      "pose": {
+        "angle": 360.0,
+        "center": [
+          0.059917449951171875,
+          1.1087722778320313
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[15]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          11.199136734008789,
+          -0.33761119842529297
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[16]",
+      "net": "3V3",
+      "pose": {
+        "angle": 270.0,
+        "center": [
+          4.062803268432617,
+          -4.673783302307129
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[17]",
+      "net": "GND",
+      "pose": {
+        "angle": 809.9999389648438,
+        "center": [
+          4.890935897827148,
+          -0.4078645706176758
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[18]",
+      "net": "3V3",
+      "pose": {
+        "angle": 719.9999389648438,
+        "center": [
+          13.250930786132813,
+          -4.323036193847656
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[19]",
+      "net": "GND",
+      "pose": {
+        "angle": 630.0,
+        "center": [
+          0.9545783996582031,
+          -13.206164360046387
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[20]",
+      "net": "3V3",
+      "pose": {
+        "angle": 270.0,
+        "center": [
+          3.6794185638427734,
+          -7.606540203094482
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[21]",
+      "net": "GND",
+      "pose": {
+        "angle": 360.0,
+        "center": [
+          -5.1570329666137695,
+          -1.0402469635009766
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[22]",
+      "net": "GND",
+      "pose": {
+        "angle": 0.0,
+        "center": [
+          9.19631576538086,
+          -5.1835222244262695
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[23]",
+      "net": "GND",
+      "pose": {
+        "angle": 360.0,
+        "center": [
+          -5.718034744262695,
+          -3.1250572204589844
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[24]",
+      "net": "GND",
+      "pose": {
+        "angle": 269.9999694824219,
+        "center": [
+          6.380990982055664,
+          -0.3737020492553711
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[25]",
+      "net": "GND",
+      "pose": {
+        "angle": 270.0,
+        "center": [
+          3.2068653106689453,
+          -4.6341142654418945
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[26]",
+      "net": "3V3",
+      "pose": {
+        "angle": -90.0,
+        "center": [
+          10.547405242919922,
+          0.07741451263427734
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[27]",
+      "net": "GND",
+      "pose": {
+        "angle": 540.0,
+        "center": [
+          13.423961639404297,
+          1.8341588973999023
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[28]",
+      "net": "GND",
+      "pose": {
+        "angle": 360.0,
+        "center": [
+          7.744495391845703,
+          -12.915958404541016
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[29]",
+      "net": "3V3",
+      "pose": {
+        "angle": 540.0,
+        "center": [
+          -1.7172393798828125,
+          -9.041801452636719
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[30]",
+      "net": "GND",
+      "pose": {
+        "angle": 270.0,
+        "center": [
+          2.267152786254883,
+          -8.958223342895508
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[31]",
+      "net": "GND",
+      "pose": {
+        "angle": 719.9999389648438,
+        "center": [
+          13.465648651123047,
+          -9.180246353149414
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit.mcu._Capture__link.vias[32]",
+      "net": "GND",
+      "pose": {
+        "angle": 270.0,
+        "center": [
+          -6.789020538330078,
+          -6.202153205871582
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit._Capture__link.vias[0]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          -12.738073348999023,
+          4.0234479904174805
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit._Capture__link.vias[1]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          -7.653072357177734,
+          11.769637107849121
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    },
+    {
+      "def_name": "StdViaPreferred",
+      "id": "circuit._Capture__link.vias[2]",
+      "net": "GND",
+      "pose": {
+        "angle": 180.0,
+        "center": [
+          -6.103841781616211,
+          4.0234479904174805
+        ],
+        "flip_x": false,
+        "side": "Top"
+      },
+      "start_layer": 0,
+      "stop_layer": 3
+    }
+  ]
+}
