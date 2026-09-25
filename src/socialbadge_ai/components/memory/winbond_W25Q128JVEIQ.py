@@ -78,7 +78,15 @@ class W25Q128JVEIQ(jitx.Component):
         )
         # Exposed thermal pad: E2 is width (X), D2 is height (Y).
         .thermal_pad(rectangle(4.30, 3.40))
-        .density_level(DensityLevel.B)
+        # `landpattern` is a class attribute, evaluated at import time —
+        # long before BadgeDesign.__init__ sets its ambient
+        # DensityLevelContext(DensityLevel.C), so that context can never
+        # reach here. Set it explicitly here instead (matching
+        # raspberry_pi_RP2040.py's own generator), to match the rest of the
+        # design rather than silently falling back to jitxlib-standard's
+        # global default (B — looser: toe 0.3mm / courtyard_excess 0.25mm
+        # vs C's 0.2mm / 0.1mm).
+        .density_level(DensityLevel.C)
     )
 
     symbol = BoxSymbol(
