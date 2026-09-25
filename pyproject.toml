@@ -8,10 +8,10 @@ version = "0.1.0"
 description = "Social Badge AI hardware design"
 requires-python = ">=3.10"
 dependencies = [
-    "jitx>=4.4,<4.5",
-    "jitxlib-standard>=4.4,<4.5",
-    "jitxlib-parts>=1.0",
-    "jitxlib-voltage-divider>=1.0",
+    "jitx>=4.5.0a1",
+    "jitxlib-standard>=4.5.0a1",
+    "jitxlib-jlcpcb>=4.0.0a1",
+    "jitxlib-parts>=2.0.0a2,<3",
 ]
 
 [tool.setuptools.packages.find]

@@ -29,7 +29,8 @@ from jitx.constraints import (
 )
 from jitx.shapes.composites import rectangle
 from jitxlib.jlcpcb import JLC04161H_1080
-from jitxlib.parts import CapacitorQuery, ResistorQuery
+from jitxlib.landpatterns.ipc import DensityLevel, DensityLevelContext
+from jitxlib.parts import CapacitorQuery, Minimize, ResistorQuery
 from jitxlib.symbols.net_symbols import GroundSymbol, PowerSymbol
 
 from ..circuits.charger import Charger
@@ -39,7 +40,7 @@ from ..circuits.rp2040_support import RP2040Support
 from ..circuits.status_leds import N_LEDS, StatusLEDs
 from ..circuits.usb_c import USB_C
 from ..components.connectors.shouhan_PH2_2P import PH2_2P
-
+from .layout_placements import layout_placements
 
 # Tags applied to nets so the design rules can match them by class.
 class PowerTag(Tag):
@@ -50,12 +51,12 @@ class GroundTag(Tag):
     """Marks ground nets for the wider-trace rule."""
 
 
-# Board outline — 50 × 50 mm with 0.25 mm rounded corners.
-BOARD_SHAPE = rectangle(50.0, 50.0, radius=0.25)
+# Board outline — 30.0 × 30.0 mm with 0.25 mm rounded corners.
+BOARD_SHAPE = rectangle(30.0, 30.0, radius=0.25)
 
 
 class BadgeBoard(Board):
-    """50 × 50 mm board with 0.25 mm rounded corners."""
+    """30.0 × 30.0 mm board with 0.25 mm rounded corners."""
 
     shape = BOARD_SHAPE
 
@@ -153,19 +154,28 @@ class BadgeDesign(Design):
     substrate = JLC04161H_1080()
 
     # SMT production defaults — JLCPCB full assembly, ceramic decoupling.
+    # rank=Minimize("case") prefers the smallest available case (0402) and
+    # only falls back to 0603/0805 when 0402 isn't stocked for that value —
+    # otherwise the live JLCPCB catalog query can non-deterministically pick
+    # a larger case with no preference set.
     capacitor_defaults = CapacitorQuery(
-        mounting="smd",
-        type="ceramic",
         case=["0402", "0603", "0805"],
+        rank=Minimize("case"),
     )
     resistor_defaults = ResistorQuery(
-        mounting="smd",
         case=["0402", "0603", "0805"],
+        rank=Minimize("case"),
     )
 
     circuit = BadgeCircuit()
 
     def __init__(self):
+        # Pin the IPC density level explicitly: jitxlib-standard 4.5.0a1
+        # defaults to B (median keepout), where this design was tuned for
+        # the older C (least/tightest) default — pin it rather than drift
+        # with whatever a future library version defaults to.
+        DensityLevelContext(DensityLevel.C).set()
+
         # Production-friendly defaults calibrated to JLC 4-layer 1080
         # (minimum trace width / clearance 0.0889 mm / 3.5 mil per JLC standard rules).
         self.rules = [
@@ -176,3 +186,4 @@ class BadgeDesign(Design):
                 PowerTag() | GroundTag(), priority=1
             ).trace_width(0.4),
         ]
+        layout_placements("jitx_export.json")

@@ -14,6 +14,7 @@ External ports:
 
 from jitx import Circuit, Net
 from jitx.net import Port
+from jitx.units import ohm
 from jitxlib.parts import Resistor
 
 from ..components.diodes.kt_0603_red import KT_0603R
@@ -34,12 +35,18 @@ class StatusLEDs(Circuit):
         self.GND += self.gnd
 
         self.leds = [KT_0603R() for _ in range(N_LEDS)]
-        self.r_leds = [Resistor(resistance=LED_DRIVE_RESISTOR_OHMS) for _ in range(N_LEDS)]
+        self.r_leds = [Resistor(resistance=LED_DRIVE_RESISTOR_OHMS * ohm) for _ in range(N_LEDS)]
 
         # For each LED: GPIO -> R -> LED anode -> LED cathode -> GND
         self.cathode_nets = [self.leds[i].K + self.GND for i in range(N_LEDS)]
-        for i in range(N_LEDS):
-            self.r_leds[i].insert(self.gpio[i], self.leds[i].A)
+        self.drive_nets = [
+            net
+            for i in range(N_LEDS)
+            for net in (
+                self.r_leds[i].p1 + self.gpio[i],
+                self.r_leds[i].p2 + self.leds[i].A,
+            )
+        ]
 
 
 Device = StatusLEDs

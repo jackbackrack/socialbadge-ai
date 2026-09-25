@@ -12,6 +12,8 @@ Per datasheet typical application (page 1):
 
 from jitx import Circuit, Net
 from jitx.common import Power
+from jitx.net import ShortTrace
+from jitx.units import F, V, ohm
 from jitxlib.parts import Capacitor, Resistor
 
 from ..components.power_linear_regulators.microchip_MCP73831T_2ACI_OT import MCP73831T_2ACI_OT
@@ -42,20 +44,29 @@ class Charger(Circuit):
         self.V3V3 += self.v3v3.Vp
 
         # Input/output bulk caps per datasheet
-        self.c_vdd = Capacitor(capacitance=4.7e-6, rated_voltage=10.0, temperature_coefficient_code="X5R")
-        self.c_vdd.insert(self.u1.VDD, self.u1.VSS, short_trace=True)
+        self.c_vdd = Capacitor(capacitance=4.7e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_vdd_nets = [
+            ShortTrace(self.c_vdd.p1, self.u1.VDD),
+            ShortTrace(self.c_vdd.p2, self.u1.VSS),
+        ]
 
-        self.c_vbat = Capacitor(capacitance=4.7e-6, rated_voltage=10.0, temperature_coefficient_code="X5R")
-        self.c_vbat.insert(self.u1.VBAT, self.u1.VSS, short_trace=True)
+        self.c_vbat = Capacitor(capacitance=4.7e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_vbat_nets = [
+            ShortTrace(self.c_vbat.p1, self.u1.VBAT),
+            ShortTrace(self.c_vbat.p2, self.u1.VSS),
+        ]
 
         # PROG resistor sets charge current: I = 1000/R_prog = 500 mA at 2k
-        self.r_prog = Resistor(resistance=2.0e3)
-        self.r_prog.insert(self.u1.PROG, self.u1.VSS)
+        self.r_prog = Resistor(resistance=2.0e3 * ohm)
+        self.r_prog_nets = [
+            self.r_prog.p1 + self.u1.PROG,
+            self.r_prog.p2 + self.u1.VSS,
+        ]
 
         # Charge status LED: 3V3 -> R_lim -> LED anode, LED cathode -> STAT
         # STAT pin is tri-state (sinks when charging) so LED lights when charging
         self.STAT += self.u1.STAT
-        self.r_led = Resistor(resistance=1.0e3)
+        self.r_led = Resistor(resistance=1.0e3 * ohm)
         self.led = KT_0603R()
         # Wire: V3V3 -> r_led -> LED anode; LED cathode -> STAT
         self.led_drive_nets = [

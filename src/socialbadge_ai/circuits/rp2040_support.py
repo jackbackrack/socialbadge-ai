@@ -20,11 +20,12 @@ External interface:
 
 from jitx import Circuit, Net
 from jitx.common import Power
-from jitx.net import Port
+from jitx.net import Port, ShortTrace
+from jitx.units import F, V, ohm
 from jitxlib.parts import Capacitor, Resistor
 
 from ..components.mcus.raspberry_pi_RP2040 import RP2040
-from ..components.memory.winbond_W25Q128JVSIQ import W25Q128JVSIQ
+from ..components.memory.winbond_W25Q128JVEIQ import W25Q128JVEIQ
 from ..components.crystals.yxc_X322512MSB4SI import X322512MSB4SI
 from ..components.buttons.xkb_TS_1187A import TS_1187A_B_A_B
 
@@ -45,7 +46,7 @@ class RP2040Support(Circuit):
         self.VREG_VOUT = Net(name="1V1")
 
         self.mcu = RP2040()
-        self.flash = W25Q128JVSIQ()
+        self.flash = W25Q128JVEIQ()
         self.xtal = X322512MSB4SI()
         self.sw_run = TS_1187A_B_A_B()    # RESET button
         self.sw_boot = TS_1187A_B_A_B()   # BOOTSEL button
@@ -75,38 +76,67 @@ class RP2040Support(Circuit):
         self.VREG_VOUT += self.mcu.VREG_VOUT + self.mcu.DVDD[0] + self.mcu.DVDD[1]
 
         # --- Decoupling caps ---
-        # 100 nF on every IOVDD pin
+        # 100 nF on every IOVDD pin.
+        # case="0402" (vs. the 0402/0603/0805 design-wide default) so these fit
+        # in the tight pin-adjacent placement around the RP2040 QFN-56.
         self.c_iovdd = [
-            Capacitor(capacitance=100e-9, rated_voltage=10.0, temperature_coefficient_code="X7R")
+            Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
             for _ in range(6)
         ]
-        for i, c in enumerate(self.c_iovdd):
-            c.insert(self.mcu.IOVDD[i], self.mcu.GND, short_trace=True)
+        self.c_iovdd_nets = [
+            net
+            for i, c in enumerate(self.c_iovdd)
+            for net in (ShortTrace(c.p1, self.mcu.IOVDD[i]), ShortTrace(c.p2, self.mcu.GND))
+        ]
 
         # 100 nF on ADC_AVDD, USB_VDD
-        self.c_adc_avdd = Capacitor(capacitance=100e-9, rated_voltage=10.0, temperature_coefficient_code="X7R")
-        self.c_adc_avdd.insert(self.mcu.ADC_AVDD, self.mcu.GND, short_trace=True)
+        self.c_adc_avdd = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_adc_avdd_nets = [
+            ShortTrace(self.c_adc_avdd.p1, self.mcu.ADC_AVDD),
+            ShortTrace(self.c_adc_avdd.p2, self.mcu.GND),
+        ]
 
-        self.c_usb_vdd = Capacitor(capacitance=100e-9, rated_voltage=10.0, temperature_coefficient_code="X7R")
-        self.c_usb_vdd.insert(self.mcu.USB_VDD, self.mcu.GND, short_trace=True)
+        self.c_usb_vdd = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_usb_vdd_nets = [
+            ShortTrace(self.c_usb_vdd.p1, self.mcu.USB_VDD),
+            ShortTrace(self.c_usb_vdd.p2, self.mcu.GND),
+        ]
 
         # 1 uF bulk + 100 nF HF on VREG_VIN
-        self.c_vreg_vin_bulk = Capacitor(capacitance=1.0e-6, rated_voltage=10.0, temperature_coefficient_code="X5R")
-        self.c_vreg_vin_bulk.insert(self.mcu.VREG_VIN, self.mcu.GND, short_trace=True)
-        self.c_vreg_vin_hf = Capacitor(capacitance=100e-9, rated_voltage=10.0, temperature_coefficient_code="X7R")
-        self.c_vreg_vin_hf.insert(self.mcu.VREG_VIN, self.mcu.GND, short_trace=True)
+        self.c_vreg_vin_bulk = Capacitor(capacitance=1.0e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_vreg_vin_bulk_nets = [
+            ShortTrace(self.c_vreg_vin_bulk.p1, self.mcu.VREG_VIN),
+            ShortTrace(self.c_vreg_vin_bulk.p2, self.mcu.GND),
+        ]
+        self.c_vreg_vin_hf = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_vreg_vin_hf_nets = [
+            ShortTrace(self.c_vreg_vin_hf.p1, self.mcu.VREG_VIN),
+            ShortTrace(self.c_vreg_vin_hf.p2, self.mcu.GND),
+        ]
 
         # 1 uF on VREG_VOUT (also feeds DVDD) + 100 nF per DVDD pin
-        self.c_vreg_vout = Capacitor(capacitance=1.0e-6, rated_voltage=10.0, temperature_coefficient_code="X5R")
-        self.c_vreg_vout.insert(self.mcu.VREG_VOUT, self.mcu.GND, short_trace=True)
-        self.c_dvdd0 = Capacitor(capacitance=100e-9, rated_voltage=10.0, temperature_coefficient_code="X7R")
-        self.c_dvdd0.insert(self.mcu.DVDD[0], self.mcu.GND, short_trace=True)
-        self.c_dvdd1 = Capacitor(capacitance=100e-9, rated_voltage=10.0, temperature_coefficient_code="X7R")
-        self.c_dvdd1.insert(self.mcu.DVDD[1], self.mcu.GND, short_trace=True)
+        self.c_vreg_vout = Capacitor(capacitance=1.0e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_vreg_vout_nets = [
+            ShortTrace(self.c_vreg_vout.p1, self.mcu.VREG_VOUT),
+            ShortTrace(self.c_vreg_vout.p2, self.mcu.GND),
+        ]
+        self.c_dvdd0 = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_dvdd0_nets = [
+            ShortTrace(self.c_dvdd0.p1, self.mcu.DVDD[0]),
+            ShortTrace(self.c_dvdd0.p2, self.mcu.GND),
+        ]
+        self.c_dvdd1 = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_dvdd1_nets = [
+            ShortTrace(self.c_dvdd1.p1, self.mcu.DVDD[1]),
+            ShortTrace(self.c_dvdd1.p2, self.mcu.GND),
+        ]
 
         # 100 nF on flash VCC
-        self.c_flash_vcc = Capacitor(capacitance=100e-9, rated_voltage=10.0, temperature_coefficient_code="X7R")
-        self.c_flash_vcc.insert(self.flash.VCC, self.flash.GND, short_trace=True)
+        self.c_flash_vcc = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_flash_vcc_nets = [
+            ShortTrace(self.c_flash_vcc.p1, self.flash.VCC),
+            ShortTrace(self.c_flash_vcc.p2, self.flash.GND),
+        ]
 
         # --- Crystal ---
         # Crystal between XIN/XOUT; load caps tuned for CL ≈ 20 pF (using 27 pF E-series)
@@ -116,10 +146,10 @@ class RP2040Support(Circuit):
         self.XOUT += self.mcu.XOUT + self.xtal.OSC2
 
         # Crystal load caps — NOT short_trace (placement is per the crystal datasheet)
-        self.c_xin = Capacitor(capacitance=27e-12, rated_voltage=10.0, temperature_coefficient_code="C0G")
-        self.c_xin.insert(self.mcu.XIN, self.mcu.GND)
-        self.c_xout = Capacitor(capacitance=27e-12, rated_voltage=10.0, temperature_coefficient_code="C0G")
-        self.c_xout.insert(self.mcu.XOUT, self.mcu.GND)
+        self.c_xin = Capacitor(capacitance=27e-12 * F, rated_voltage=50.0 * V, temperature_coefficient_code="C0G")
+        self.c_xin_nets = [self.c_xin.p1 + self.mcu.XIN, self.c_xin.p2 + self.mcu.GND]
+        self.c_xout = Capacitor(capacitance=27e-12 * F, rated_voltage=50.0 * V, temperature_coefficient_code="C0G")
+        self.c_xout_nets = [self.c_xout.p1 + self.mcu.XOUT, self.c_xout.p2 + self.mcu.GND]
 
         # --- TESTEN tied to GND ---
         self.GND += self.mcu.TESTEN
@@ -143,10 +173,13 @@ class RP2040Support(Circuit):
         # 10 kΩ pull-up to 3V3 + 100 nF debounce + RUN button to GND
         self.RUN = Net(name="RUN")
         self.RUN += self.mcu.RUN
-        self.r_run_pu = Resistor(resistance=10e3)
-        self.r_run_pu.insert(self.mcu.RUN, self.V3V3)
-        self.c_run_debounce = Capacitor(capacitance=100e-9, rated_voltage=10.0, temperature_coefficient_code="X7R")
-        self.c_run_debounce.insert(self.mcu.RUN, self.mcu.GND)
+        self.r_run_pu = Resistor(resistance=10e3 * ohm)
+        self.r_run_pu_nets = [self.r_run_pu.p1 + self.mcu.RUN, self.r_run_pu.p2 + self.V3V3]
+        self.c_run_debounce = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R")
+        self.c_run_debounce_nets = [
+            self.c_run_debounce.p1 + self.mcu.RUN,
+            self.c_run_debounce.p2 + self.mcu.GND,
+        ]
 
         # Reset button: TS-1187A pads A+B are one contact, C+D the other.
         # Wire one side to RUN, other side to GND.
@@ -159,8 +192,11 @@ class RP2040Support(Circuit):
         # Pico-style: 1 kΩ between flash /CS and the button; button to GND.
         # During reset the resistor pulls /CS low when button is held.
         self.BOOTSEL_NODE = Net(name="BOOTSEL_NODE")
-        self.r_bootsel = Resistor(resistance=1.0e3)
-        self.r_bootsel.insert(self.flash.CS_n, self.BOOTSEL_NODE)
+        self.r_bootsel = Resistor(resistance=1.0e3 * ohm)
+        self.r_bootsel_nets = [
+            self.r_bootsel.p1 + self.flash.CS_n,
+            self.r_bootsel.p2 + self.BOOTSEL_NODE,
+        ]
         self.bootsel_btn_nets = [
             self.sw_boot.A + self.sw_boot.B + self.BOOTSEL_NODE,
             self.sw_boot.C + self.sw_boot.D + self.GND,

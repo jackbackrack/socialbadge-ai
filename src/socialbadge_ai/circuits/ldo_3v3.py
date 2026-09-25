@@ -7,6 +7,8 @@ of input and output is stable across the operating range.
 
 from jitx import Circuit, Net
 from jitx.common import Power
+from jitx.net import ShortTrace
+from jitx.units import F, V
 from jitxlib.parts import Capacitor
 
 from ..components.power_linear_regulators.diodes_AP2112K_33TRG1 import AP2112K_33TRG1
@@ -29,11 +31,17 @@ class LDO_3V3(Circuit):
         self.VIN += self.vin.Vp + self.u1.VIN + self.u1.EN  # EN tied to VIN
         self.V3V3 += self.vout.Vp + self.u1.VOUT
 
-        self.c_in = Capacitor(capacitance=1.0e-6, rated_voltage=10.0, temperature_coefficient_code="X5R")
-        self.c_in.insert(self.u1.VIN, self.u1.GND, short_trace=True)
+        self.c_in = Capacitor(capacitance=1.0e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_in_nets = [
+            ShortTrace(self.c_in.p1, self.u1.VIN),
+            ShortTrace(self.c_in.p2, self.u1.GND),
+        ]
 
-        self.c_out = Capacitor(capacitance=1.0e-6, rated_voltage=10.0, temperature_coefficient_code="X5R")
-        self.c_out.insert(self.u1.VOUT, self.u1.GND, short_trace=True)
+        self.c_out = Capacitor(capacitance=1.0e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_out_nets = [
+            ShortTrace(self.c_out.p1, self.u1.VOUT),
+            ShortTrace(self.c_out.p2, self.u1.GND),
+        ]
 
 
 Device = LDO_3V3
