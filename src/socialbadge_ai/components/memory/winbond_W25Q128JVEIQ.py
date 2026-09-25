@@ -54,14 +54,17 @@ class W25Q128JVEIQ(jitx.Component):
     VCC = Port()        # Pin 8
 
     # WSON-8 8x6-mm (Package Code E) dimensions, datasheet section 10.4, page 70.
-    # No-lead (flush) package: pads sit at the body edge, so span = E (the
-    # across-rows body dimension), unlike a gull-wing SOIC where the lead
-    # span exceeds the body.
+    # Ground-truthed against the real LCSC/EasyEDA KiCad footprint for C2456297:
+    # the 4-pad rows run along the 6 mm (E) edge (pitch axis) and are separated
+    # across the 8 mm (D) edge (span axis) — i.e. the pins sit on the *short*
+    # edges of the body, not the long ones. The generator's DualColumn layout
+    # always puts its "span" axis first, so span/package.width take D and
+    # package.length (the pitch-axis extent) takes E.
     landpattern = (
         SON(num_leads=8)
         .lead_profile(
             LeadProfile(
-                span=Toleranced.min_max(5.90, 6.10),    # E — across-rows body width
+                span=Toleranced.min_max(7.90, 8.10),    # D — across-rows body length
                 pitch=1.27,                              # e — lead pitch, BSC
                 type=SONLead(
                     length=Toleranced.min_max(0.45, 0.55),  # L — pad length
@@ -71,13 +74,13 @@ class W25Q128JVEIQ(jitx.Component):
         )
         .package_body(
             RectanglePackage(
-                width=Toleranced.min_max(5.90, 6.10),    # E — body width
-                length=Toleranced.min_max(7.90, 8.10),   # D — body length (pin-row direction)
+                width=Toleranced.min_max(7.90, 8.10),    # D — across-rows body length
+                length=Toleranced.min_max(5.90, 6.10),   # E — body width (pin-row direction)
                 height=Toleranced.min_max(0.70, 0.80),   # A — total height
             )
         )
-        # Exposed thermal pad: E2 is width (X), D2 is height (Y).
-        .thermal_pad(rectangle(4.30, 3.40))
+        # Exposed thermal pad: D2 is on the span axis (X), E2 on the pitch axis (Y).
+        .thermal_pad(rectangle(3.40, 4.30))
         # `landpattern` is a class attribute, evaluated at import time —
         # long before BadgeDesign.__init__ sets its ambient
         # DensityLevelContext(DensityLevel.C), so that context can never
