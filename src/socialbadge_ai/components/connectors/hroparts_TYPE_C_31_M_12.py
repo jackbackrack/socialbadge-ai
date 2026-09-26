@@ -12,6 +12,7 @@ from jitx.net import Port
 from jitx.shapes.composites import capsule, rectangle
 from jitx.shapes.primitive import Arc, ArcPolyline, Circle, Polyline, Text
 from jitx.anchor import Anchor
+from jitxlib.jlcpcb import LCSCPart
 from jitxlib.symbols.box import BoxSymbol, PinGroup, Row, Column
 
 
@@ -133,6 +134,7 @@ class TYPE_C_31_M_12(jitx.Component):
     mpn = "TYPE-C-31-M-12"
     manufacturer = "Korean Hroparts Elec"
     reference_designator_prefix = "J"
+    lcsc = LCSCPart("C165948")
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/9e56b777c022540fcce7c7f67825f55e.pdf"
 
     # --- Ports ---

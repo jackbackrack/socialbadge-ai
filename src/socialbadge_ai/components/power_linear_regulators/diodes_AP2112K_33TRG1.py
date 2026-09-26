@@ -15,6 +15,7 @@ Pinout (from datasheet Pin Description table, page 2):
 import jitx
 from jitx.net import Port
 from jitx.toleranced import Toleranced
+from jitxlib.jlcpcb import LCSCPart
 from jitxlib.landpatterns.generators.sot import SOT23_5, SOTLeadProfile
 from jitxlib.landpatterns.ipc import DensityLevel
 from jitxlib.landpatterns.package import RectanglePackage
@@ -25,6 +26,9 @@ class AP2112K_33TRG1(jitx.Component):
     mpn = "AP2112K-3.3TRG1"
     manufacturer = "Diodes Incorporated"
     reference_designator_prefix = "U"
+    # Verified against the real LCSC/EasyEDA footprint: our pad cloud aligns
+    # pin-for-pin (same numbering) under a 270 deg correction, residual 0.08mm.
+    lcsc = LCSCPart("C51118", orientation=270.0)
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/5b29baebdc4332b382a530ff21092301.pdf"
 
     VIN = Port()         # Pin 1

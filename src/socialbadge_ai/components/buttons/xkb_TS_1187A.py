@@ -12,6 +12,7 @@ from jitx.net import Port
 from jitx.shapes.composites import rectangle
 from jitx.shapes.primitive import Arc, ArcPolyline, Polyline, Text
 from jitx.anchor import Anchor
+from jitxlib.jlcpcb import LCSCPart
 from jitxlib.symbols.box import BoxSymbol, PinGroup, Row, Column
 
 
@@ -85,6 +86,7 @@ class TS_1187A_B_A_B(jitx.Component):
     mpn = "TS-1187A-B-A-B"
     manufacturer = "XKB Connection"
     reference_designator_prefix = "SW"
+    lcsc = LCSCPart("C318884")
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/56c8799ae5193945a16a1ffbe378246a.pdf"
 
     # --- Ports ---

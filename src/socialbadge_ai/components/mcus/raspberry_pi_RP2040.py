@@ -14,6 +14,7 @@ from jitx import PadMapping
 from jitx.net import Port
 from jitx.toleranced import Toleranced
 from jitx.shapes.composites import rectangle
+from jitxlib.jlcpcb import LCSCPart
 from jitxlib.landpatterns.generators.qfn import QFN, QFNLead
 from jitxlib.landpatterns.leads import LeadProfile
 from jitxlib.landpatterns.package import RectanglePackage
@@ -28,6 +29,7 @@ class RP2040(jitx.Component):
     mpn = "RP2040"
     manufacturer = "Raspberry Pi"
     reference_designator_prefix = "U"
+    lcsc = LCSCPart("C2040")
     datasheet = "https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf"
 
     # Power supplies

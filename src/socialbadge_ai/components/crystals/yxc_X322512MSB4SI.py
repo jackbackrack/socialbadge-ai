@@ -12,6 +12,7 @@ from jitx.net import Port
 from jitx.shapes.composites import rectangle
 from jitx.shapes.primitive import Arc, ArcPolyline, Polyline, Text
 from jitx.anchor import Anchor
+from jitxlib.jlcpcb import LCSCPart
 from jitxlib.symbols.box import BoxSymbol, PinGroup, Row, Column
 
 
@@ -74,6 +75,7 @@ class X322512MSB4SI(jitx.Component):
     mpn = "X322512MSB4SI"
     manufacturer = "YXC"
     reference_designator_prefix = "Y"
+    lcsc = LCSCPart("C9002")
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/a84bd8d530dd46e4b0f6d0ee59d8a89c.pdf"
 
     # --- Ports ---

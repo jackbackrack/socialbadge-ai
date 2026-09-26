@@ -18,6 +18,7 @@ R_PROG = 2 kΩ → 500 mA.
 import jitx
 from jitx.net import Port
 from jitx.toleranced import Toleranced
+from jitxlib.jlcpcb import LCSCPart
 from jitxlib.landpatterns.generators.sot import SOT23_5, SOTLeadProfile, SOTLead
 from jitxlib.landpatterns.ipc import DensityLevel
 from jitxlib.landpatterns.package import RectanglePackage
@@ -28,6 +29,9 @@ class MCP73831T_2ACI_OT(jitx.Component):
     mpn = "MCP73831T-2ACI/OT"
     manufacturer = "Microchip Technology"
     reference_designator_prefix = "U"
+    # Verified against the real LCSC/EasyEDA footprint: our pad cloud aligns
+    # pin-for-pin (same numbering) under a 270 deg correction, residual 0.09mm.
+    lcsc = LCSCPart("C424093", orientation=270.0)
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/c7ec00710e742b7fb9393e620ae1332b.pdf"
 
     STAT = Port()   # Pin 1 — tri-state status output

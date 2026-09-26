@@ -12,6 +12,7 @@ from jitx.net import Port
 from jitx.shapes.composites import rectangle
 from jitx.shapes.primitive import Arc, ArcPolyline, Polyline, Text
 from jitx.anchor import Anchor
+from jitxlib.jlcpcb import LCSCPart
 from jitxlib.symbols.box import BoxSymbol, PinGroup, Row, Column
 
 
@@ -74,6 +75,13 @@ class KT_0603R(jitx.Component):
     mpn = "KT-0603R"
     manufacturer = "Hubei KENTO"
     reference_designator_prefix = "D"
+    # This landpattern's own pad numbering (K=p[1], A=p[2]) is the opposite of
+    # the real catalogue part's (pin 1=A, pin 2=K). Since a 2-pin footprint is
+    # 180 deg symmetric, geometry alone can't set the orientation and the
+    # exporter falls back to matching pad number labels — which would silently
+    # pair our cathode with their anode. Pinned to the value verified by
+    # same-polarity position matching instead.
+    lcsc = LCSCPart("C2286", orientation=0.0)
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/011ec3e8cb1e825f6961d29bc4db4c7a.pdf"
 
     # --- Ports ---

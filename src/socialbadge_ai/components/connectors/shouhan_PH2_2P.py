@@ -18,6 +18,7 @@ from jitx.net import Port
 from jitx.shapes.composites import rectangle
 from jitx.shapes.primitive import Arc, ArcPolyline, Polyline, Text
 from jitx.anchor import Anchor
+from jitxlib.jlcpcb import LCSCPart
 from jitxlib.symbols.box import BoxSymbol, PinGroup, Row, Column
 
 
@@ -89,6 +90,7 @@ class PH2_2P(jitx.Component):
     mpn = "2.0-2P WT"
     manufacturer = "SHOU HAN"
     reference_designator_prefix = "J"
+    lcsc = LCSCPart("C668620")
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/dce18c3d77bfbed062e0f133b57b17e3.pdf"
 
     # --- Ports ---

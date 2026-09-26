@@ -42,7 +42,11 @@ class W25Q128JVEIQ(jitx.Component):
     manufacturer = "Winbond"
     reference_designator_prefix = "U"
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/d009d960f1daec6149edaa35b7dae856.pdf"
-    lcsc = LCSCPart("C2456297")
+    # Auto-measured orientation snapped to 265 deg (residual noise from our
+    # IPC-generated pads not exactly matching the real footprint); the real
+    # part is a plain rectangular WSON-8, so the true value is the nearby
+    # clean multiple of 90, pinned explicitly instead.
+    lcsc = LCSCPart("C2456297", orientation=270.0)
 
     CS_n = Port()       # Pin 1
     DO = Port()         # Pin 2 (IO1)

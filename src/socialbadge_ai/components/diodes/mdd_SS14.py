@@ -12,6 +12,7 @@ from jitx.net import Port
 from jitx.shapes.composites import rectangle
 from jitx.shapes.primitive import Arc, ArcPolyline, Polyline, Text
 from jitx.anchor import Anchor
+from jitxlib.jlcpcb import LCSCPart
 from jitxlib.symbols.box import BoxSymbol, PinGroup, Row, Column
 
 
@@ -75,6 +76,13 @@ class SS14(jitx.Component):
     mpn = "SS14"
     manufacturer = "MDD"
     reference_designator_prefix = "D"
+    # This landpattern's own pad numbering (A=p[1], K=p[2]) is the opposite of
+    # the real catalogue part's (pin 1=K, pin 2=A). Since a 2-pin footprint is
+    # 180 deg symmetric, geometry alone can't set the orientation and the
+    # exporter falls back to matching pad number labels — which would silently
+    # pair our anode with their cathode. Pinned to the value verified by
+    # same-polarity position matching instead.
+    lcsc = LCSCPart("C2480", orientation=0.0)
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/9977bb85cd7e349115b7bcb7054cfa0d.pdf"
 
     # --- Ports ---
