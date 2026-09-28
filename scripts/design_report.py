@@ -337,6 +337,10 @@ def _collect(
                 "manufacturer": comp.manufacturer,
                 "def_name": Proxy.type(comp).__name__,
                 "placement": pose or False,
+                # fixed: the design code placed this part (`.at(...)`), so its pose
+                # is intent, not a placer's guess. A layout tool should hold it;
+                # non-fixed parts are free to move.
+                "fixed": code_pose is not None,
                 "declared_placement": code_pose,
                 "moved_from_declared": None
                 if code_pose is None or pose is None
@@ -461,7 +465,7 @@ def _collect(
             "modules": len(modules),
             "components": len(components),
             "unplaced_components": sum(1 for c in components if not c["placement"]),
-            "code_placed_components": sum(1 for c in components if c["declared_placement"]),
+            "fixed_components": sum(1 for c in components if c["fixed"]),
             "moved_from_declared": sum(1 for c in components if c["moved_from_declared"]),
             "pads": sum(len(c["pads"]) for c in components),
             "nets": len(netlist),
@@ -520,8 +524,8 @@ def _report(data: dict) -> str:
         f"  board       {_span(s['board_extent'])}",
         f"  stackup     {s['conductor_layers']} conductor layers",
         f"  contents    {s['modules']} modules, {s['components']} components "
-        f"({s['unplaced_components']} unplaced, {s['code_placed_components']} placed in "
-        f"code, {s['moved_from_declared']} moved since), {s['pads']} pads, "
+        f"({s['unplaced_components']} unplaced, {s['fixed_components']} fixed by code, "
+        f"{s['moved_from_declared']} moved since), {s['pads']} pads, "
         f"{s['nets']} nets ({s['named_nets']} named), "
         f"{s['short_traces']} short traces, {s['vias']} vias, {s['pours']} pours",
         "  note        mm and degrees. `at` is the captured layout; `code` is where the "
@@ -545,6 +549,7 @@ def _report(data: dict) -> str:
             f"  {comp['reference'] or comp['id']}  {'  '.join(named)}",
             f"      path    {comp['id']}   in {comp['module_id'] or '(top)'}",
             f"      at      {_place(comp['placement'])}"
+            + ("   [FIXED]" if comp["fixed"] else "")
             + (f"   mfr {comp['manufacturer']}" if comp["manufacturer"] else ""),
         ]
         if comp["moved_from_declared"]:
