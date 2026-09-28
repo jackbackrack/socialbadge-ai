@@ -29,7 +29,7 @@ import jitx
 import shapely
 from jitx._structural import Proxy
 from jitx.anchor import Anchor
-from jitx.circuit import Circuit
+from jitx.circuit import Circuit, InstancePlacement
 from jitx.component import Component
 from jitx.copper import Copper, Pour
 from jitx.feature import Courtyard
@@ -225,15 +225,66 @@ def _padshapes(coppers, where) -> list[dict]:
     return [{"shape": p, "layers": sorted(ls)} for p, ls in groups.values()]
 
 
-def declared_placements(design: RuntimeDesign) -> dict[str, dict | None]:
-    """Each component's placement as the design code set it (`.at(...)` /
-    `Circuit.place`), keyed by component path. Call this after `submit` and
-    BEFORE `capture`: capture overwrites component transforms with the layout
-    tool's result, which includes any moves made in the editor since."""
-    return {
-        str(trace.path): _pose(_compose(trace.transform, comp.transform))
-        for trace, comp in visit(design.root, Component)
+def declared_placements(design: RuntimeDesign) -> dict[str, dict]:
+    """Every component the design code placed, keyed by component path, as
+    {"placed_by": "at" | "place", "pose": pose-or-None}. Components the code
+    left alone are absent. Call this after `submit` and BEFORE `capture`:
+    capture overwrites component transforms with the layout tool's result,
+    which includes any moves made in the editor since.
+
+    Two ways to place in code, recorded differently by jitx:
+      * `comp.at(...)` sets the component's own transform.
+      * `circuit.place(comp, ...)` leaves the transform alone and adds an
+        `InstancePlacement` request to the circuit, optionally relative to
+        another component. Its board pose is the circuit's frame (or the
+        `relative_to` part's pose) composed with the request; it is None when
+        that frame can't be resolved before layout (e.g. a floating circuit).
+    """
+    paths: dict[int, str] = {}
+    frames: dict[int, Transform | None] = {}
+    for trace, comp in visit(design.root, Component):
+        paths[id(comp)] = str(trace.path)
+        frames[id(comp)] = _compose(trace.transform, comp.transform)
+
+    declared: dict[str, dict] = {
+        paths[id(comp)]: {"placed_by": "at", "pose": _pose(frames[id(comp)])}
+        for _trace, comp in visit(design.root, Component)
+        if comp.transform is not None
     }
+
+    requests = []
+    for trace, request in visit(design.root, InstancePlacement):
+        target = request.instance()
+        if isinstance(target, Component) and id(target) in paths:
+            anchor = request.relative_to() if request.relative_to is not None else None
+            requests.append((trace.transform, request.placement, target, anchor))
+
+    # A request relative to another placed part resolves once that part has;
+    # iterate until nothing new resolves (chains are short in practice).
+    resolved: dict[int, Transform | None] = {}
+    pending = requests
+    while pending:
+        remaining = []
+        for frame, placement, target, anchor in pending:
+            if anchor is None:
+                resolved[id(target)] = _compose(frame, placement)
+            elif id(anchor) in resolved or frames.get(id(anchor)) is not None:
+                base = resolved.get(id(anchor), frames.get(id(anchor)))
+                resolved[id(target)] = _compose(base, placement)
+            else:
+                remaining.append((frame, placement, target, anchor))
+        if len(remaining) == len(pending):
+            for _frame, _placement, target, _anchor in remaining:
+                resolved.setdefault(id(target), None)
+            break
+        pending = remaining
+
+    for _frame, _placement, target, _anchor in requests:
+        declared[paths[id(target)]] = {
+            "placed_by": "place",
+            "pose": _pose(resolved.get(id(target))),
+        }
+    return declared
 
 
 def _same_pose(a: dict, b: dict, tol: float = 1e-4) -> bool:
@@ -250,7 +301,7 @@ def _collect(
     design_cls: type | None = None,
     *,
     geometry: bool,
-    declared: dict[str, dict | None] | None = None,
+    declared: dict[str, dict] | None = None,
 ) -> dict:
     nets: RuntimeDesign.Nets = _member(design, "nets")
     layers: RuntimeDesign.Layers = _member(design, "layers")
@@ -286,7 +337,8 @@ def _collect(
         cid = str(ctrace.path)
         placement = _compose(ctrace.transform, comp.transform)
         pose = _pose(placement)
-        code_pose = declared.get(cid) if declared is not None else None
+        code = declared.get(cid) if declared is not None else None
+        code_pose = code["pose"] if code is not None else None
 
         port_paths = {id(port): str(t.path) for t, port in visit(comp, Port)}
         port_of_pad = {
@@ -337,10 +389,11 @@ def _collect(
                 "manufacturer": comp.manufacturer,
                 "def_name": Proxy.type(comp).__name__,
                 "placement": pose or False,
-                # fixed: the design code placed this part (`.at(...)`), so its pose
-                # is intent, not a placer's guess. A layout tool should hold it;
-                # non-fixed parts are free to move.
-                "fixed": code_pose is not None,
+                # fixed: the design code placed this part (`.at(...)` or
+                # `Circuit.place`), so its pose is intent, not a placer's guess. A
+                # layout tool should hold it; non-fixed parts are free to move.
+                "fixed": code is not None,
+                "placed_by": code["placed_by"] if code is not None else None,
                 "declared_placement": code_pose,
                 "moved_from_declared": None
                 if code_pose is None or pose is None
@@ -628,7 +681,7 @@ def export(
     *,
     out: str = "",
     geometry: bool = True,
-    declared: dict[str, dict | None] | None = None,
+    declared: dict[str, dict] | None = None,
 ) -> None:
     data = _collect(design, design_cls, geometry=geometry, declared=declared)
     paths = [
