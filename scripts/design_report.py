@@ -335,21 +335,30 @@ def _collect(design: RuntimeDesign, design_cls: type | None = None, *, geometry:
     # A pour is attached with `net += Pour(...)`, so the reliable way back to
     # its net is the Net whose connections hold it; `nets.find` is the fallback
     # for a pour the runtime has assigned a computed net to directly.
-    net_of_pour: dict[int, Net] = {
-        id(member): net
-        for net in extract(design.root, Net)
-        for member in net._connected
-        if isinstance(member, Pour)
-    }
+    #
+    # The same scan also *discovers* pours: one attached only through
+    # `net += Pour(...)`, never assigned to a circuit attribute (a pattern jitx
+    # warns is deprecated), is invisible to `design.query(Pour)` and every other
+    # structural walk. Those are reported with "owned": false, an id derived
+    # from the net's path, and geometry in the net's frame.
+    net_of_pour: dict[int, Net] = {}
+    net_only: list[tuple[str, Transform | None, Pour]] = []
+    for ntrace, net in visit(design.root, Net):
+        members = [m for m in net._connected if isinstance(m, Pour)]
+        for k, member in enumerate(members):
+            if id(member) not in net_of_pour:
+                net_of_pour[id(member)] = net
+                net_only.append((f"{ntrace.path}+pour[{k}]", ntrace.transform, member))
+
     pours = []
-    for trace, pour in design.query(Pour):
-        ref = str(trace.path)
+
+    def add_pour(ref: str, xform: Transform | None, pour: Pour, owned: bool) -> None:
         owner = net_of_pour.get(id(pour))
         net = net_of(owner) if owner is not None else net_of(pour)
         if net is not None:
             net["pour"] = True
             net.setdefault("pours", []).append(ref)
-        shape = _polys(trace.transform * pour.shape, ref) if trace.transform else []
+        shape = _polys(xform * pour.shape, ref) if xform is not None else []
         pours.append(
             {
                 "id": ref,
@@ -357,10 +366,19 @@ def _collect(design: RuntimeDesign, design_cls: type | None = None, *, geometry:
                 "layer": layers.normalize(pour.layer),
                 "rank": pour.rank,
                 "isolate": pour.isolate,
+                "owned": owned,
                 "shape": shape if geometry else [],
                 "extent": _extent(shape),
             }
         )
+
+    owned_ids = set()
+    for trace, pour in design.query(Pour):
+        owned_ids.add(id(pour))
+        add_pour(str(trace.path), trace.transform, pour, owned=True)
+    for ref, xform, pour in net_only:
+        if id(pour) not in owned_ids:
+            add_pour(ref, xform, pour, owned=False)
 
     netlist = sorted(entries.values(), key=lambda n: (n["name"] is None, n["name"]))
     for index, net in enumerate(netlist):
@@ -538,6 +556,7 @@ def _report(data: dict) -> str:
         out += [
             f"  {p['id']:<32} layer {p['layer']:<3} rank {p['rank']:<3}"
             f" {_span(p['extent'])}  net {p['net'] or '-'}"
+            + ("" if p["owned"] else "   [NET-ONLY]")
             for p in data["pours"]
         ]
 
