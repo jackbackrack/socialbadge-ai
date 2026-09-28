@@ -1,5 +1,7 @@
 """Reverse-flow design report: per-component/per-net placements, pads,
-courtyards, nets, short traces, vias, copper pours, modules and the board outline.
+courtyards, nets, short traces, vias, copper pours, modules and the board outline. Each
+component carries both its captured layout placement and the placement the
+design code declared, so a consumer can tell code intent from editor moves.
 
 Ported from internal-test-designs' `internal_test_designs.plugins.DesignReport`
 so it runs in this project's own venv against its own (newer) jitx/jitxlib
@@ -223,7 +225,33 @@ def _padshapes(coppers, where) -> list[dict]:
     return [{"shape": p, "layers": sorted(ls)} for p, ls in groups.values()]
 
 
-def _collect(design: RuntimeDesign, design_cls: type | None = None, *, geometry: bool) -> dict:
+def declared_placements(design: RuntimeDesign) -> dict[str, dict | None]:
+    """Each component's placement as the design code set it (`.at(...)` /
+    `Circuit.place`), keyed by component path. Call this after `submit` and
+    BEFORE `capture`: capture overwrites component transforms with the layout
+    tool's result, which includes any moves made in the editor since."""
+    return {
+        str(trace.path): _pose(_compose(trace.transform, comp.transform))
+        for trace, comp in visit(design.root, Component)
+    }
+
+
+def _same_pose(a: dict, b: dict, tol: float = 1e-4) -> bool:
+    return (
+        math.dist(a["center"], b["center"]) <= tol
+        and abs((a["angle"] - b["angle"] + 180) % 360 - 180) <= tol
+        and a["flip_x"] == b["flip_x"]
+        and a.get("side") == b.get("side")
+    )
+
+
+def _collect(
+    design: RuntimeDesign,
+    design_cls: type | None = None,
+    *,
+    geometry: bool,
+    declared: dict[str, dict | None] | None = None,
+) -> dict:
     nets: RuntimeDesign.Nets = _member(design, "nets")
     layers: RuntimeDesign.Layers = _member(design, "layers")
 
@@ -257,6 +285,8 @@ def _collect(design: RuntimeDesign, design_cls: type | None = None, *, geometry:
     for ctrace, comp in visit(design.root, Component):
         cid = str(ctrace.path)
         placement = _compose(ctrace.transform, comp.transform)
+        pose = _pose(placement)
+        code_pose = declared.get(cid) if declared is not None else None
 
         port_paths = {id(port): str(t.path) for t, port in visit(comp, Port)}
         port_of_pad = {
@@ -306,7 +336,11 @@ def _collect(design: RuntimeDesign, design_cls: type | None = None, *, geometry:
                 "mpn": comp.mpn,
                 "manufacturer": comp.manufacturer,
                 "def_name": Proxy.type(comp).__name__,
-                "placement": _pose(placement) or False,
+                "placement": pose or False,
+                "declared_placement": code_pose,
+                "moved_from_declared": None
+                if code_pose is None or pose is None
+                else not _same_pose(code_pose, pose),
                 "courtyard": courtyard if geometry else [],
                 "courtyard_extent": _extent(courtyard),
                 "pads": pads,
@@ -427,6 +461,8 @@ def _collect(design: RuntimeDesign, design_cls: type | None = None, *, geometry:
             "modules": len(modules),
             "components": len(components),
             "unplaced_components": sum(1 for c in components if not c["placement"]),
+            "code_placed_components": sum(1 for c in components if c["declared_placement"]),
+            "moved_from_declared": sum(1 for c in components if c["moved_from_declared"]),
             "pads": sum(len(c["pads"]) for c in components),
             "nets": len(netlist),
             "named_nets": sum(1 for n in netlist if n["name"]),
@@ -484,10 +520,14 @@ def _report(data: dict) -> str:
         f"  board       {_span(s['board_extent'])}",
         f"  stackup     {s['conductor_layers']} conductor layers",
         f"  contents    {s['modules']} modules, {s['components']} components "
-        f"({s['unplaced_components']} unplaced), {s['pads']} pads, "
+        f"({s['unplaced_components']} unplaced, {s['code_placed_components']} placed in "
+        f"code, {s['moved_from_declared']} moved since), {s['pads']} pads, "
         f"{s['nets']} nets ({s['named_nets']} named), "
         f"{s['short_traces']} short traces, {s['vias']} vias, {s['pours']} pours",
-        "  note        mm and degrees. A placement is in board coordinates, a "
+        "  note        mm and degrees. `at` is the captured layout; `code` is where the "
+        "design code put it,",
+        "              shown only when the layout has moved it. A placement is in "
+        "board coordinates, a "
         "pad pose in component coordinates,",
         "              and a pad layer is landpattern-relative: 0 is the side "
         "the component sits on.",
@@ -507,6 +547,8 @@ def _report(data: dict) -> str:
             f"      at      {_place(comp['placement'])}"
             + (f"   mfr {comp['manufacturer']}" if comp["manufacturer"] else ""),
         ]
+        if comp["moved_from_declared"]:
+            out.append(f"      code    {_place(comp['declared_placement'])}   [MOVED]")
         if comp["courtyard_extent"]:
             out.append(f"      court   {_span(comp['courtyard_extent'])}")
         out.append(f"      pads    {len(pads)}")
@@ -576,9 +618,14 @@ def _report(data: dict) -> str:
 
 
 def export(
-    design: RuntimeDesign, design_cls: type | None = None, *, out: str = "", geometry: bool = True
+    design: RuntimeDesign,
+    design_cls: type | None = None,
+    *,
+    out: str = "",
+    geometry: bool = True,
+    declared: dict[str, dict | None] | None = None,
 ) -> None:
-    data = _collect(design, design_cls, geometry=geometry)
+    data = _collect(design, design_cls, geometry=geometry, declared=declared)
     paths = [
         f"{out}.{ext}" if out else _out_path(design, "design-report", ext)
         for ext in ("txt", "json")
@@ -604,8 +651,9 @@ def main() -> None:
         sys.exit(1)
     with jitx.runtime as r:
         d = r.submit(cls)
+        declared = declared_placements(d)  # before capture overwrites them
         d.capture()
-        export(d, cls, out=out)
+        export(d, cls, out=out, declared=declared)
 
 
 if __name__ == "__main__":
