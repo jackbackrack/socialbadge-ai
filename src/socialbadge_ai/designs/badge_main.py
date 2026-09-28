@@ -138,10 +138,19 @@ class BadgeCircuit(Circuit):
         # Stackup is SIG / GND / PWR / SIG — inner layer 1 is a solid GND
         # reference plane and inner layer 2 is the 3V3 power plane. The two
         # outer signal layers (0, 3) get GND fills in unrouted areas.
-        self.GND += Pour(BOARD_SHAPE, layer=0, isolate=0.25, rank=1)
-        self.GND += Pour(BOARD_SHAPE, layer=1, isolate=0.25, rank=1)
-        self.V3V3 += Pour(BOARD_SHAPE, layer=2, isolate=0.25, rank=1)
-        self.GND += Pour(BOARD_SHAPE, layer=3, isolate=0.25, rank=1)
+        # Assigned as circuit attributes (not just `net += Pour(...)`), so each
+        # pour is also "strongly" owned by the circuit rather than only
+        # reachable via the net — the latter is deprecated (and, separately,
+        # invisible to structural traversal like `visit()`/`query()`, which
+        # the reverse-flow design-report script relies on to enumerate pours).
+        self.gnd_pour_l0 = Pour(BOARD_SHAPE, layer=0, isolate=0.25, rank=1)
+        self.gnd_pour_l1 = Pour(BOARD_SHAPE, layer=1, isolate=0.25, rank=1)
+        self.v3v3_pour_l2 = Pour(BOARD_SHAPE, layer=2, isolate=0.25, rank=1)
+        self.gnd_pour_l3 = Pour(BOARD_SHAPE, layer=3, isolate=0.25, rank=1)
+        self.GND += self.gnd_pour_l0
+        self.GND += self.gnd_pour_l1
+        self.GND += self.gnd_pour_l3
+        self.V3V3 += self.v3v3_pour_l2
 
 
 class BadgeDesign(Design):

@@ -1,5 +1,5 @@
 """Reverse-flow design report: per-component/per-net placements, pads,
-courtyards, nets, short traces, vias, modules and the board outline.
+courtyards, nets, short traces, vias, copper pours, modules and the board outline.
 
 Ported from internal-test-designs' `internal_test_designs.plugins.DesignReport`
 so it runs in this project's own venv against its own (newer) jitx/jitxlib
@@ -15,32 +15,31 @@ Writes <output_stem>.txt and <output_stem>.json (default stem:
 
 from __future__ import annotations
 
-from collections import defaultdict
 import importlib
 import json
 import math
 import sys
 import textwrap
+from collections import defaultdict
+from typing import Any
 
+import jitx
 import shapely
-
 from jitx._structural import Proxy
 from jitx.anchor import Anchor
 from jitx.circuit import Circuit
 from jitx.component import Component
-from jitx.copper import Copper
+from jitx.copper import Copper, Pour
 from jitx.feature import Courtyard
 from jitx.inspect import extract, visit
 from jitx.landpattern import Pad, PadMapping
-from jitx.net import Port, ShortTrace
+from jitx.net import Net, Port, ShortTrace
 from jitx.placement import Placement
 from jitx.run.runtime import RuntimeDesign
 from jitx.shapes import primitive
 from jitx.shapes.shapely import ShapelyGeometry
 from jitx.transform import Transform
 from jitx.via import Via
-
-import jitx
 
 DIGITS = 6  # coordinate precision
 WIDTH = 96  # wrap width for pad lists
@@ -69,9 +68,7 @@ def _text_bounds(text: primitive.Text) -> tuple[float, float, float, float]:
 
 def _shapely_from_shape(shape) -> ShapelyGeometry:
     if isinstance(shape.geometry, primitive.Text):
-        return ShapelyGeometry(shapely.box(*_text_bounds(shape.geometry))).apply(
-            shape.transform
-        )
+        return ShapelyGeometry(shapely.box(*_text_bounds(shape.geometry))).apply(shape.transform)
     return ShapelyGeometry.from_shape(shape, tolerance=1e-3)
 
 
@@ -106,6 +103,63 @@ def _polys(shape, where) -> list[dict]:
     except Exception as e:
         print(f"skipping unconvertible shape at {where}: {shape.geometry!r} ({e})")
         return []
+
+
+def _as_shape(x):
+    """Wrap a bare `Primitive` (e.g. a class-level `shape = Circle(...)`) into
+    a proper `Shape(geometry, transform)`, which is what `_shapely_from_shape`
+    and the rest of this module expect. A `Shape` is returned as-is."""
+    from jitx.shapes import Shape as JitxShape
+    from jitx.transform import IDENTITY
+
+    return x if isinstance(x, JitxShape) else JitxShape(x, IDENTITY)
+
+
+def _member(obj, name: str) -> Any:
+    """`obj.name`, calling it if it is a method. `RuntimeDesign.nets` and
+    `.layers` are plain methods in jitx 4.4 and properties from 4.5 on, so this
+    keeps the script working on either side of that change."""
+    value = getattr(obj, name)
+    return value() if callable(value) else value
+
+
+def _declared_board_shape(design_cls: type | None):
+    """The board's shape exactly as declared in source, bypassing the runtime
+    translate step -- which currently collapses any non-rectangular board
+    shape down to its axis-aligned bounding rectangle (confirmed against
+    jitx 4.5.0a5: true even for an explicit many-sided polygon, so it isn't
+    specific to the `Circle` primitive). `design_cls.board` is a lazily
+    resolved `Instantiable` wrapper rather than a plain `Board` instance, so
+    this reaches into its private `_Instantiable__instantiable` to recover the
+    original `Board` subclass and read its `shape` class attribute directly --
+    a plain Python object, never touched by the runtime. Returns None (falling
+    back to the runtime's, possibly-degraded, shape) if that internal ever
+    changes shape in a future jitx release.
+    """
+    if design_cls is None:
+        return None
+    try:
+        board_cls = design_cls.board._Instantiable__instantiable
+        return board_cls.shape
+    except Exception:
+        return None
+
+
+def _circle_entry(shape) -> dict | None:
+    """`shape`'s native JSON entry if it is (or wraps) a bare `Circle`, else
+    None. Distinct from `_polys`, which always discretizes into a polygon --
+    this preserves exact circularity for a consumer that wants it."""
+    from jitx.shapes.primitive import Circle
+
+    shape = _as_shape(shape)
+    if not isinstance(shape.geometry, Circle):
+        return None
+    (cx, cy), _angle, _scale = shape.transform.trs
+    return {
+        "type": "circle",
+        "center": [round(cx, DIGITS), round(cy, DIGITS)],
+        "diameter": round(shape.geometry.diameter, DIGITS),
+    }
 
 
 def _extent(polys) -> list[float] | None:
@@ -165,15 +219,13 @@ def _padshapes(coppers, where) -> list[dict]:
     groups: dict[str, tuple[list[dict], list[int]]] = {}
     for copper in coppers:
         polys = _polys(copper.shape, where)
-        groups.setdefault(json.dumps(polys, sort_keys=True), (polys, []))[1].append(
-            copper.layer
-        )
+        groups.setdefault(json.dumps(polys, sort_keys=True), (polys, []))[1].append(copper.layer)
     return [{"shape": p, "layers": sorted(ls)} for p, ls in groups.values()]
 
 
-def _collect(design: RuntimeDesign, *, geometry: bool) -> dict:
-    nets = design.nets
-    layers = design.layers
+def _collect(design: RuntimeDesign, design_cls: type | None = None, *, geometry: bool) -> dict:
+    nets: RuntimeDesign.Nets = _member(design, "nets")
+    layers: RuntimeDesign.Layers = _member(design, "layers")
 
     coppers_at = defaultdict(list)
     for trace, copper in design.query(Copper):
@@ -185,9 +237,7 @@ def _collect(design: RuntimeDesign, *, geometry: bool) -> dict:
         group = nets.find(element)
         if group is None:
             return None
-        return entries.setdefault(
-            id(group), {"name": group.name, "pads": [], "vias": []}
-        )
+        return entries.setdefault(id(group), {"name": group.name, "pads": [], "vias": []})
 
     modules = [
         {
@@ -276,13 +326,39 @@ def _collect(design: RuntimeDesign, *, geometry: bool) -> dict:
                 "id": ref,
                 "def_name": Proxy.type(via).__name__,
                 "pose": _pose(_compose(trace.transform, via.transform)),
-                "start_layer": layers.normalize(span[0])
-                if span[0] is not None
-                else None,
-                "stop_layer": layers.normalize(span[1])
-                if span[1] is not None
-                else None,
+                "start_layer": layers.normalize(span[0]) if span[0] is not None else None,
+                "stop_layer": layers.normalize(span[1]) if span[1] is not None else None,
                 "net": net["name"] if net else None,
+            }
+        )
+
+    # A pour is attached with `net += Pour(...)`, so the reliable way back to
+    # its net is the Net whose connections hold it; `nets.find` is the fallback
+    # for a pour the runtime has assigned a computed net to directly.
+    net_of_pour: dict[int, Net] = {
+        id(member): net
+        for net in extract(design.root, Net)
+        for member in net._connected
+        if isinstance(member, Pour)
+    }
+    pours = []
+    for trace, pour in design.query(Pour):
+        ref = str(trace.path)
+        owner = net_of_pour.get(id(pour))
+        net = net_of(owner) if owner is not None else net_of(pour)
+        if net is not None:
+            net["pour"] = True
+            net.setdefault("pours", []).append(ref)
+        shape = _polys(trace.transform * pour.shape, ref) if trace.transform else []
+        pours.append(
+            {
+                "id": ref,
+                "net": net["name"] if net else None,
+                "layer": layers.normalize(pour.layer),
+                "rank": pour.rank,
+                "isolate": pour.isolate,
+                "shape": shape if geometry else [],
+                "extent": _extent(shape),
             }
         )
 
@@ -317,11 +393,14 @@ def _collect(design: RuntimeDesign, *, geometry: bool) -> dict:
             if e["pads"] and e["pads"][0] in pad_centers
         ]
         distance = round(math.dist(*ends), DIGITS) if len(ends) == 2 else None
-        shorts.append(
-            {"id": str(trace.path), "endpoints": endpoints, "distance": distance}
-        )
+        shorts.append({"id": str(trace.path), "endpoints": endpoints, "distance": distance})
 
-    board = _polys(design.root.board.shape, "board")
+    declared_shape = _declared_board_shape(design_cls)
+    board_shape = (
+        _as_shape(declared_shape) if declared_shape is not None else design.root.board.shape
+    )
+    board = _polys(board_shape, "board")
+    board_native = _circle_entry(board_shape)
     return {
         "design": design.name,
         "summary": {
@@ -335,13 +414,16 @@ def _collect(design: RuntimeDesign, *, geometry: bool) -> dict:
             "named_nets": sum(1 for n in netlist if n["name"]),
             "short_traces": len(shorts),
             "vias": len(vias),
+            "pours": len(pours),
         },
         "board_shape": board if geometry else [],
+        "board_shape_native": board_native if geometry else None,
         "modules": modules,
         "components": components,
         "nets": netlist,
         "short_traces": shorts,
         "vias": vias,
+        "pours": pours,
     }
 
 
@@ -386,7 +468,7 @@ def _report(data: dict) -> str:
         f"  contents    {s['modules']} modules, {s['components']} components "
         f"({s['unplaced_components']} unplaced), {s['pads']} pads, "
         f"{s['nets']} nets ({s['named_nets']} named), "
-        f"{s['short_traces']} short traces, {s['vias']} vias",
+        f"{s['short_traces']} short traces, {s['vias']} vias, {s['pours']} pours",
         "  note        mm and degrees. A placement is in board coordinates, a "
         "pad pose in component coordinates,",
         "              and a pad layer is landpattern-relative: 0 is the side "
@@ -425,6 +507,8 @@ def _report(data: dict) -> str:
             counts += f", {len(net['vias'])} vias"
         if net.get("short_trace"):
             counts += "   [SHORT TRACE]"
+        if net.get("pour"):
+            counts += "   [POUR]"
         out.append(f"  {net['id']:<24} {counts}")
         out += _refs(net["pads"], " " * 6)
         out += _refs([f"via {v}" for v in net["vias"]], " " * 6)
@@ -449,6 +533,14 @@ def _report(data: dict) -> str:
             for v in data["vias"]
         ]
 
+    if data["pours"]:
+        out += ["", f"POURS  {len(data['pours'])}"]
+        out += [
+            f"  {p['id']:<32} layer {p['layer']:<3} rank {p['rank']:<3}"
+            f" {_span(p['extent'])}  net {p['net'] or '-'}"
+            for p in data["pours"]
+        ]
+
     out += ["", f"MODULES  {len(data['modules'])}"]
     children = defaultdict(list)
     for module in data["modules"]:
@@ -457,18 +549,17 @@ def _report(data: dict) -> str:
     def tree(parent, depth):
         for module in children[parent]:
             indent = "  " * (depth + 1)
-            out.append(
-                f"{indent}{module['id']:<{max(4, 44 - len(indent))}} "
-                f"{module['def_name']}"
-            )
+            out.append(f"{indent}{module['id']:<{max(4, 44 - len(indent))}} {module['def_name']}")
             tree(module["id"], depth + 1)
 
     tree(None, 0)
     return "\n".join(out) + "\n"
 
 
-def export(design: RuntimeDesign, *, out: str = "", geometry: bool = True) -> None:
-    data = _collect(design, geometry=geometry)
+def export(
+    design: RuntimeDesign, design_cls: type | None = None, *, out: str = "", geometry: bool = True
+) -> None:
+    data = _collect(design, design_cls, geometry=geometry)
     paths = [
         f"{out}.{ext}" if out else _out_path(design, "design-report", ext)
         for ext in ("txt", "json")
@@ -495,7 +586,7 @@ def main() -> None:
     with jitx.runtime as r:
         d = r.submit(cls)
         d.capture()
-        export(d, out=out)
+        export(d, cls, out=out)
 
 
 if __name__ == "__main__":
