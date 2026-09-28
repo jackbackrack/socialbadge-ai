@@ -10,8 +10,13 @@ after its circuit has been created::
         def __init__(self):
             layout_placements("layout.json")
 
-The file format is the one read by ``jitx.layout_input.LayoutInput``, with
-component ids being paths relative to the current design.
+The file format is this module's own (there is no ``jitx.layout_input`` in
+jitx 4.4/4.5 to defer to): a JSON object with an optional ``board_shape``
+(``{"type": "rectangle"|"polygon", ...}``) and a ``components`` list of
+``{"id": <path relative to the design>, "placement": {"center", "angle",
+"side", "flip_x"}}``. Written by :py:func:`layout_placements` itself (see
+``_write_layout``) and read back the same way, so any producer just needs to
+match that shape.
 """
 
 from __future__ import annotations

@@ -226,65 +226,104 @@ def _padshapes(coppers, where) -> list[dict]:
 
 
 def declared_placements(design: RuntimeDesign) -> dict[str, dict]:
-    """Every component the design code placed, keyed by component path, as
-    {"placed_by": "at" | "place", "pose": pose-or-None}. Components the code
-    left alone are absent. Call this after `submit` and BEFORE `capture`:
-    capture overwrites component transforms with the layout tool's result,
-    which includes any moves made in the editor since.
+    """How the design code placed each component and module, keyed by path.
+    Call this after `submit` and BEFORE `capture`: capture overwrites
+    transforms with the layout tool's result, editor moves included.
 
-    Two ways to place in code, recorded differently by jitx:
-      * `comp.at(...)` sets the component's own transform.
-      * `circuit.place(comp, ...)` leaves the transform alone and adds an
-        `InstancePlacement` request to the circuit, optionally relative to
-        another component. Its board pose is the circuit's frame (or the
-        `relative_to` part's pose) composed with the request; it is None when
-        that frame can't be resolved before layout (e.g. a floating circuit).
+    Each entry is {"placed_by", "fixed", "relative", "pose"}:
+      * "fixed": True only for a GLOBAL `.at(...)` placement - the component's
+        own transform, with no floating circuit between it and the board. Its
+        pose is design intent; a layout tool should hold it.
+      * "relative": {"to": <component or module path>, "pose": offset} for a
+        placement that is rigid with respect to something that can itself
+        move: `circuit.place(x, ..., relative_to=anchor)`, or `.at(...)` inside
+        a floating circuit (`circuit.at(floating=True)`, or a subcircuit that
+        was itself `place`d). "pose" is in the anchor's frame; a layout tool
+        should lock the two together with that offset.
+      * `circuit.place(x, ...)` with no anchor, inside a circuit that is on the
+        board frame, is neither: a layout replayed from a file lands here, and
+        it is a user placement, so it is free to move (fixed False, relative
+        None) with its requested pose as the starting point.
+      * "pose": absolute board pose where it can be resolved from code (a
+        chain of relative placements ending at the board), else None.
+    Components and modules the code left alone are absent.
     """
-    paths: dict[int, str] = {}
-    frames: dict[int, Transform | None] = {}
-    for trace, comp in visit(design.root, Component):
-        paths[id(comp)] = str(trace.path)
-        frames[id(comp)] = _compose(trace.transform, comp.transform)
+    circuits: dict[str, Circuit] = {str(t.path): c for t, c in visit(design.root, Circuit)}
+    comps: dict[str, Component] = {str(t.path): c for t, c in visit(design.root, Component)}
+    paths: dict[int, str] = {id(o): p for p, o in (*circuits.items(), *comps.items())}
+    circuit_paths = list(circuits)
 
-    declared: dict[str, dict] = {
-        paths[id(comp)]: {"placed_by": "at", "pose": _pose(frames[id(comp)])}
-        for _trace, comp in visit(design.root, Component)
-        if comp.transform is not None
-    }
+    def frame(path: str, local: Transform | None) -> tuple[str | None, Transform | None]:
+        """(anchor, pose relative to it) for `local` expressed in the frame of the
+        circuit that owns `path`: walk up until the board (anchor None) or the
+        first floating circuit (its frame is the anchor)."""
+        xform = local
+        owner = _owner(path, circuit_paths)
+        while owner is not None:
+            parent = circuits[owner].transform
+            if parent is None:
+                return owner, xform
+            xform = _compose(parent, xform)
+            owner = _owner(owner, circuit_paths)
+        return None, xform
 
-    requests = []
+    entries: dict[str, dict] = {}
+    for path, comp in comps.items():
+        if comp.transform is None:
+            continue
+        anchor, xform = frame(path, comp.transform)
+        entries[path] = {
+            "placed_by": "at",
+            "fixed": anchor is None,
+            "relative": None if anchor is None else {"to": anchor, "pose": _pose(xform)},
+            "local": (anchor, xform),
+        }
+
     for trace, request in visit(design.root, InstancePlacement):
         target = request.instance()
-        if isinstance(target, Component) and id(target) in paths:
-            anchor = request.relative_to() if request.relative_to is not None else None
-            requests.append((trace.transform, request.placement, target, anchor))
-
-    # A request relative to another placed part resolves once that part has;
-    # iterate until nothing new resolves (chains are short in practice).
-    resolved: dict[int, Transform | None] = {}
-    pending = requests
-    while pending:
-        remaining = []
-        for frame, placement, target, anchor in pending:
-            if anchor is None:
-                resolved[id(target)] = _compose(frame, placement)
-            elif id(anchor) in resolved or frames.get(id(anchor)) is not None:
-                base = resolved.get(id(anchor), frames.get(id(anchor)))
-                resolved[id(target)] = _compose(base, placement)
-            else:
-                remaining.append((frame, placement, target, anchor))
-        if len(remaining) == len(pending):
-            for _frame, _placement, target, _anchor in remaining:
-                resolved.setdefault(id(target), None)
-            break
-        pending = remaining
-
-    for _frame, _placement, target, _anchor in requests:
-        declared[paths[id(target)]] = {
+        if target is None or id(target) not in paths:
+            continue
+        path = paths[id(target)]
+        other = request.relative_to() if request.relative_to is not None else None
+        if other is not None and id(other) in paths:
+            anchor, xform = paths[id(other)], request.placement
+        else:
+            anchor, xform = frame(str(trace.path), request.placement)
+        entries[path] = {
             "placed_by": "place",
-            "pose": _pose(resolved.get(id(target))),
+            "fixed": False,
+            "relative": None if anchor is None else {"to": anchor, "pose": _pose(xform)},
+            "local": (anchor, xform),
         }
-    return declared
+
+    # Absolute pose: follow each relative chain to the board. A floating
+    # module that nothing places has no code pose, so its chain is None.
+    absolute: dict[str, Transform | None] = {}
+
+    def resolve(path: str, seen: frozenset[str] = frozenset()) -> Transform | None:
+        if path in absolute:
+            return absolute[path]
+        entry = entries.get(path)
+        if entry is None or path in seen:
+            return None
+        anchor, xform = entry["local"]
+        base = None if anchor is None else resolve(anchor, seen | {path})
+        result = xform if anchor is None else _compose(base, xform)
+        absolute[path] = result
+        return result
+
+    for path, entry in entries.items():
+        entry["pose"] = _pose(resolve(path))
+        del entry["local"]
+    # Floating modules are anchors for their children even when nothing places
+    # them; record that before capture gives them a transform.
+    for path, circuit in circuits.items():
+        if circuit.transform is None:
+            entries.setdefault(
+                path,
+                {"placed_by": None, "fixed": False, "relative": None, "pose": None},
+            )["floating"] = True
+    return entries
 
 
 def _same_pose(a: dict, b: dict, tol: float = 1e-4) -> bool:
@@ -323,6 +362,8 @@ def _collect(
             "id": str(trace.path),
             "def_name": Proxy.type(circuit).__name__,
             "placement": _pose(_compose(trace.transform, circuit.transform)),
+            "floating": bool((declared or {}).get(str(trace.path), {}).get("floating")),
+            "relative": (declared or {}).get(str(trace.path), {}).get("relative"),
         }
         for trace, circuit in visit(design.root, Circuit)
     ]
@@ -389,10 +430,11 @@ def _collect(
                 "manufacturer": comp.manufacturer,
                 "def_name": Proxy.type(comp).__name__,
                 "placement": pose or False,
-                # fixed: the design code placed this part (`.at(...)` or
-                # `Circuit.place`), so its pose is intent, not a placer's guess. A
-                # layout tool should hold it; non-fixed parts are free to move.
-                "fixed": code is not None,
+                # See declared_placements: fixed = global `.at(...)` (hold it);
+                # relative = rigid offset from another part or module (lock them
+                # together); neither = free to move.
+                "fixed": bool(code and code["fixed"]),
+                "relative": code["relative"] if code is not None else None,
                 "placed_by": code["placed_by"] if code is not None else None,
                 "declared_placement": code_pose,
                 "moved_from_declared": None
@@ -519,6 +561,7 @@ def _collect(
             "components": len(components),
             "unplaced_components": sum(1 for c in components if not c["placement"]),
             "fixed_components": sum(1 for c in components if c["fixed"]),
+            "relative_components": sum(1 for c in components if c["relative"]),
             "moved_from_declared": sum(1 for c in components if c["moved_from_declared"]),
             "pads": sum(len(c["pads"]) for c in components),
             "nets": len(netlist),
@@ -578,6 +621,7 @@ def _report(data: dict) -> str:
         f"  stackup     {s['conductor_layers']} conductor layers",
         f"  contents    {s['modules']} modules, {s['components']} components "
         f"({s['unplaced_components']} unplaced, {s['fixed_components']} fixed by code, "
+        f"{s['relative_components']} relative, "
         f"{s['moved_from_declared']} moved since), {s['pads']} pads, "
         f"{s['nets']} nets ({s['named_nets']} named), "
         f"{s['short_traces']} short traces, {s['vias']} vias, {s['pours']} pours",
@@ -603,6 +647,7 @@ def _report(data: dict) -> str:
             f"      path    {comp['id']}   in {comp['module_id'] or '(top)'}",
             f"      at      {_place(comp['placement'])}"
             + ("   [FIXED]" if comp["fixed"] else "")
+            + (f"   [RELATIVE to {comp['relative']['to']}]" if comp["relative"] else "")
             + (f"   mfr {comp['manufacturer']}" if comp["manufacturer"] else ""),
         ]
         if comp["moved_from_declared"]:
