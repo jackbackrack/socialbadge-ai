@@ -8,3 +8,4 @@ __pycache__/
 .dependency_report.json
 .venv_sync_last
 .claude/settings.local.json
+lcsc.lock.json
