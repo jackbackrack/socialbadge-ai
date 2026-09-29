@@ -32,7 +32,7 @@ import jitx
 import shapely
 from jitx._structural import Proxy
 from jitx.anchor import Anchor
-from jitx.circuit import Circuit, InstancePlacement
+from jitx.circuit import Circuit, InstancePlacement, Route
 from jitx.component import Component
 from jitx.constraints import (
     AndExpr,
@@ -345,6 +345,32 @@ def declared_placements(design: RuntimeDesign) -> dict[str, dict]:
     return entries
 
 
+def declared_pour_shapes(design: RuntimeDesign) -> dict[int, Any]:
+    """Every `Pour`'s shape exactly as declared in code, keyed by `id(pour)`.
+    Call this after `submit` and BEFORE `capture`: capture replaces a pour's
+    `.shape` with the router's computed fill (copper minus isolation gaps
+    around every via/pad it had to avoid, often split into many pieces with
+    holes) -- useful for a real board render, but large, and not something a
+    consumer doing its own fill (e.g. a different pour algorithm, or one that
+    hasn't placed vias yet) can use as an input. Pour identity survives
+    capture, so `id(pour)` before and after refer to the same pour.
+
+    A pour the reverse-flow linker synthesizes during capture itself (rather
+    than one the design declared) has no entry here -- there is no "before"
+    for it, declared and computed are the same thing.
+    """
+    from jitx.copper import Pour
+
+    shapes: dict[int, Any] = {}
+    for _trace, pour in design.query(Pour):
+        shapes.setdefault(id(pour), pour.shape)
+    for _trace, net in visit(design.root, Net):
+        for member in net._connected:
+            if isinstance(member, Pour):
+                shapes.setdefault(id(member), member.shape)
+    return shapes
+
+
 def _tag_label(tag: Tag) -> str:
     """A tag's name: its class name, or the member name for a built-in tag
     (`IsPad`, `IsVia`, ...)."""
@@ -551,6 +577,7 @@ def _collect(
     *,
     geometry: bool,
     declared: dict[str, dict] | None = None,
+    declared_pours: dict[int, Any] | None = None,
 ) -> dict:
     nets: RuntimeDesign.Nets = _member(design, "nets")
     layers: RuntimeDesign.Layers = _member(design, "layers")
@@ -689,6 +716,55 @@ def _collect(
             }
         )
 
+    # Resolved routing: real Route objects the router (interactive or auto)
+    # has already produced, not the code-authored kind (this design has none
+    # of those) -- reverse-flow synthesizes one per routed segment, complete
+    # with .traces (the actual copper) once the design has been captured.
+    routes = []
+    route_objs = list(design.query(Route))
+    if route_objs:
+        port_paths = {id(p): str(t.path) for t, p in visit(design.root, Port)}
+        pad_paths = {id(p): str(t.path) for t, p in visit(design.root, Pad)}
+        via_paths = {id(v): str(t.path) for t, v in visit(design.root, Via)}
+
+        def endpoint_ref(obj) -> dict:
+            for kind, paths in (("port", port_paths), ("pad", pad_paths), ("via", via_paths)):
+                path = paths.get(id(obj))
+                if path is not None:
+                    return {"kind": kind, "path": path}
+            return {"kind": Proxy.type(obj).__name__, "path": None}
+
+        for trace, route in route_objs:
+            ref = str(trace.path)
+            net = net_of(route.source) or net_of(route.destination)
+            sketch = None
+            if route.sketch is not None:
+                points = route.sketch._points()
+                if trace.transform is not None:
+                    points = [trace.transform * p for p in points]
+                sketch = {
+                    "start": list(points[0]),
+                    "turns": [list(p) for p in points[1:-1]],
+                    "end": list(points[-1]),
+                }
+            shape: list[dict] = []
+            for rt in route.traces or ():
+                for rshape in rt.shapes:
+                    s = trace.transform * rshape if trace.transform is not None else rshape
+                    shape += _polys(s, ref)
+            routes.append(
+                {
+                    "id": ref,
+                    "net": net["name"] if net else None,
+                    "layer": layers.normalize(route.layer),
+                    "source": endpoint_ref(route.source),
+                    "destination": endpoint_ref(route.destination),
+                    "sketch": sketch,
+                    "shape": shape if geometry else [],
+                    "extent": _extent(shape),
+                }
+            )
+
     # A pour is attached with `net += Pour(...)`, so the reliable way back to
     # its net is the Net whose connections hold it; `nets.find` is the fallback
     # for a pour the runtime has assigned a computed net to directly.
@@ -715,7 +791,14 @@ def _collect(
         if net is not None:
             net["pour"] = True
             net.setdefault("pours", []).append(ref)
-        shape = _polys(xform * pour.shape, ref) if xform is not None else []
+        # As declared, not the router's computed fill (copper minus isolation
+        # gaps around every via/pad, often many pieces with holes): smaller,
+        # and a consumer doing its own fill can't use the computed one as
+        # input anyway. Falls back to the current shape for a pour the
+        # reverse-flow linker synthesized during capture itself, which has no
+        # "before" to report.
+        base_shape = (declared_pours or {}).get(id(pour), pour.shape)
+        shape = _polys(xform * base_shape, ref) if xform is not None else []
         pours.append(
             {
                 "id": ref,
@@ -981,6 +1064,7 @@ def _collect(
             "named_nets": sum(1 for n in netlist if n["name"]),
             "short_traces": len(shorts),
             "vias": len(vias),
+            "routes": len(routes),
             "pours": len(pours),
             "design_rules": len(rules),
             "tag_types": len(tag_types),
@@ -992,6 +1076,7 @@ def _collect(
         "nets": netlist,
         "short_traces": shorts,
         "vias": vias,
+        "routes": routes,
         "pours": pours,
         "tag_types": dict(sorted(tag_types.items())),
         "rules": rules_summary,
@@ -1043,7 +1128,7 @@ def _report(data: dict) -> str:
         f"{s['relative_components']} relative, "
         f"{s['moved_from_declared']} moved since), {s['pads']} pads, "
         f"{s['nets']} nets ({s['named_nets']} named), "
-        f"{s['short_traces']} short traces, {s['vias']} vias, {s['pours']} pours",
+        f"{s['short_traces']} short traces, {s['vias']} vias, {s['routes']} routes, {s['pours']} pours",
         "  note        mm and degrees. `at` is the captured layout; `code` is where the "
         "design code put it,",
         "              shown only when the layout has moved it. A placement is in "
@@ -1120,6 +1205,15 @@ def _report(data: dict) -> str:
             for v in data["vias"]
         ]
 
+    if data["routes"]:
+        out += ["", f"ROUTES  {len(data['routes'])}"]
+        out += [
+            f"  {rt['id']:<32} layer {rt['layer']:<3} net {rt['net'] or '-':<12}"
+            f" {rt['source']['kind']} {rt['source']['path'] or '?'}"
+            f"  ->  {rt['destination']['kind']} {rt['destination']['path'] or '?'}"
+            for rt in data["routes"]
+        ]
+
     if data["pours"]:
         out += ["", f"POURS  {len(data['pours'])}"]
         out += [
@@ -1160,8 +1254,11 @@ def export(
     out: str = "",
     geometry: bool = True,
     declared: dict[str, dict] | None = None,
+    declared_pours: dict[int, Any] | None = None,
 ) -> None:
-    data = _collect(design, design_cls, geometry=geometry, declared=declared)
+    data = _collect(
+        design, design_cls, geometry=geometry, declared=declared, declared_pours=declared_pours
+    )
     paths = [
         f"{out}.{ext}" if out else _out_path(design, "design-report", ext)
         for ext in ("txt", "json")
@@ -1188,8 +1285,9 @@ def main() -> None:
     with jitx.runtime as r:
         d = r.submit(cls)
         declared = declared_placements(d)  # before capture overwrites them
+        declared_pours = declared_pour_shapes(d)  # before capture computes the fill
         d.capture()
-        export(d, cls, out=out, declared=declared)
+        export(d, cls, out=out, declared=declared, declared_pours=declared_pours)
 
 
 if __name__ == "__main__":
