@@ -519,6 +519,23 @@ def _per_layer(values: Mapping[int, float | None]):
     return out
 
 
+# Tag names (or ancestors) that say which face a component belongs on,
+# without placing it - e.g. `class BottomSide(Tag)` assigned in a floorplan.
+_SIDE_TAGS = {"TopSide": "Top", "BottomSide": "Bottom"}
+
+
+def _side_hint(comp, declared_pose: dict | None) -> str | None:
+    """Which board face the design wants this part on: a TopSide/BottomSide
+    tag (or subclass) on the component wins; else the side of its code
+    placement; else None (no preference)."""
+    tags = Tags.get(comp)
+    for tag in tags.tags if tags is not None else []:
+        for name in (_tag_label(tag), *_tag_type(tag)["parents"]):
+            if name in _SIDE_TAGS:
+                return _SIDE_TAGS[name]
+    return declared_pose.get("side") if declared_pose else None
+
+
 def _same_pose(a: dict, b: dict, tol: float = 1e-4) -> bool:
     return (
         math.dist(a["center"], b["center"]) <= tol
@@ -639,6 +656,9 @@ def _collect(
                 "fixed": bool(code and code["fixed"]),
                 "relative": code["relative"] if code is not None else None,
                 "placed_by": code["placed_by"] if code is not None else None,
+                # the face the design wants the part on (tag or code placement),
+                # independent of where the placer put it - see _side_hint
+                "side_hint": _side_hint(comp, code_pose),
                 "declared_placement": code_pose,
                 "moved_from_declared": None
                 if code_pose is None or pose is None
@@ -954,6 +974,7 @@ def _collect(
             "unplaced_components": sum(1 for c in components if not c["placement"]),
             "fixed_components": sum(1 for c in components if c["fixed"]),
             "relative_components": sum(1 for c in components if c["relative"]),
+            "bottom_side_hints": sum(1 for c in components if c["side_hint"] == "Bottom"),
             "moved_from_declared": sum(1 for c in components if c["moved_from_declared"]),
             "pads": sum(len(c["pads"]) for c in components),
             "nets": len(netlist),
@@ -1045,6 +1066,7 @@ def _report(data: dict) -> str:
             f"      path    {comp['id']}   in {comp['module_id'] or '(top)'}",
             f"      at      {_place(comp['placement'])}"
             + ("   [FIXED]" if comp["fixed"] else "")
+            + (f"   [SIDE {comp['side_hint']}]" if comp["side_hint"] else "")
             + (f"   [RELATIVE to {comp['relative']['to']}]" if comp["relative"] else "")
             + (f"   mfr {comp['manufacturer']}" if comp["manufacturer"] else ""),
         ]
