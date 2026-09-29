@@ -12,11 +12,25 @@ after its circuit has been created::
 
 The file format is this module's own (there is no ``jitx.layout_input`` in
 jitx 4.4/4.5 to defer to): a JSON object with an optional ``board_shape``
-(``{"type": "rectangle"|"polygon", ...}``) and a ``components`` list of
+(``{"type": "rectangle"|"polygon", ...}``), a ``components`` list of
 ``{"id": <path relative to the design>, "placement": {"center", "angle",
-"side", "flip_x"}}``. Written by :py:func:`layout_placements` itself (see
-``_write_layout``) and read back the same way, so any producer just needs to
-match that shape.
+"side", "flip_x"}}``, and a ``routes`` list of route sketches:
+
+    {"source": <port or pad path>,
+     "destination": <port or pad path>,
+     "layer": <int>,
+     "sketch": {"start": [x, y], "turns": [[x, y], ...], "end": [x, y]}}
+
+``sketch`` may also be a bare list of >= 2 points (``[start, *turns, end]``),
+and may be omitted for a route with no path hint. ``source``/``destination``
+are paths the same way a component's ``id`` is, but to a ``Port`` or ``Pad``
+rather than a component. Coordinates throughout are absolute board mm,
+matching everything else in the file. A route sketch is a hint for JITX's own
+routing engine, not a resolved copper path -- see
+:py:class:`~jitx.circuit.Route.Sketch`.
+
+Written by :py:func:`layout_placements` itself (see ``_write_layout``) and
+read back the same way, so any producer just needs to match that shape.
 """
 
 from __future__ import annotations
@@ -29,9 +43,12 @@ from pathlib import Path
 from typing import Any
 
 from jitx import current
+from jitx.circuit import Route
 from jitx.component import Component
 from jitx.inspect import visit
+from jitx.landpattern import Pad
 from jitx.layerindex import Side
+from jitx.net import Port
 from jitx.placement import Placement
 from jitx.refpath import Item, RefPath
 from jitx.shapes import Shape
@@ -113,6 +130,33 @@ def layout_placements(filename: str | Path) -> None:
                 on=side,
             ),
         )
+    for entry in data.get("routes", ()):
+        try:
+            source = parse_refpath(entry["source"]).access(design)
+            destination = parse_refpath(entry["destination"]).access(design)
+        except (AttributeError, LookupError, ValueError) as e:
+            logger.error(
+                "Unable to find route endpoint %s -> %s in layout: %s",
+                entry.get("source"),
+                entry.get("destination"),
+                e,
+            )
+            continue
+        design.circuit += Route(
+            source, destination, int(entry["layer"]), sketch=_parse_sketch(entry.get("sketch"))
+        )
+
+
+def _parse_sketch(entry: Any) -> Route.Sketch | list[Point] | None:
+    if entry is None:
+        return None
+    if isinstance(entry, list):
+        return [_parse_point(p) for p in entry]
+    return Route.Sketch(
+        Route.Sketch.Terminal(_parse_point(entry["start"])),
+        [_parse_point(p) for p in entry.get("turns", ())],
+        Route.Sketch.Terminal(_parse_point(entry["end"])),
+    )
 
 
 def _write_layout(path: Path) -> None:
@@ -126,13 +170,60 @@ def _write_layout(path: Path) -> None:
                 xform = trace.transform * xform
             entry["placement"] = _placement_entry(xform)
         components.append(entry)
+    routes = _route_entries(design)
     with open(path, "w") as file:
         json.dump(
-            {"board_shape": _board_entry(design.board.shape), "components": components},
+            {
+                "board_shape": _board_entry(design.board.shape),
+                "components": components,
+                "routes": routes,
+            },
             file,
             indent=2,
         )
         file.write("\n")
+
+
+def _route_entries(design: Any) -> list[dict[str, Any]]:
+    routes = list(visit(design, Route))
+    if not routes:
+        return []
+    # Only every port/pad gets a stable path; a route may end on either.
+    endpoint_paths: dict[int, str] = {}
+    for trace, port in visit(design, Port):
+        endpoint_paths.setdefault(id(port), str(trace.path))
+    for trace, pad in visit(design, Pad):
+        endpoint_paths.setdefault(id(pad), str(trace.path))
+
+    entries: list[dict[str, Any]] = []
+    for trace, route in routes:
+        xform = trace.transform
+        source = endpoint_paths.get(id(route.source))
+        destination = endpoint_paths.get(id(route.destination))
+        if source is None or destination is None:
+            logger.warning(
+                "Skipping route %s: endpoint is not a plain Port/Pad (Via or"
+                " RouteConnectionEndpoint), which this format can't reference yet",
+                trace.path,
+            )
+            continue
+        entry: dict[str, Any] = {
+            "id": str(trace.path),
+            "source": source,
+            "destination": destination,
+            "layer": route.layer,
+        }
+        if route.sketch is not None:
+            points = route.sketch._points()
+            if xform is not None:
+                points = [xform * p for p in points]
+            entry["sketch"] = {
+                "start": list(points[0]),
+                "turns": [list(p) for p in points[1:-1]],
+                "end": list(points[-1]),
+            }
+        entries.append(entry)
+    return entries
 
 
 def _board_entry(shape: Shape) -> dict[str, Any]:
