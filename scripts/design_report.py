@@ -17,12 +17,14 @@ Writes <output_stem>.txt and <output_stem>.json (default stem:
 
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import json
 import math
 import sys
 import textwrap
 from collections import defaultdict
+from enum import Enum
 from typing import Any
 
 import jitx
@@ -31,10 +33,25 @@ from jitx._structural import Proxy
 from jitx.anchor import Anchor
 from jitx.circuit import Circuit, InstancePlacement
 from jitx.component import Component
+from jitx.constraints import (
+    AndExpr,
+    AtomExpr,
+    BinaryDesignConstraint,
+    BoolExpr,
+    BuiltinTag,
+    DesignConstraint,
+    NotExpr,
+    OnLayer,
+    OrExpr,
+    Tag,
+    Tags,
+    TrueExpr,
+    UnaryDesignConstraint,
+)
 from jitx.copper import Copper, Pour
 from jitx.feature import Courtyard
 from jitx.inspect import extract, visit
-from jitx.landpattern import Pad, PadMapping
+from jitx.landpattern import Landpattern, Pad, PadMapping
 from jitx.net import Net, Port, ShortTrace
 from jitx.placement import Placement
 from jitx.run.runtime import RuntimeDesign
@@ -326,6 +343,119 @@ def declared_placements(design: RuntimeDesign) -> dict[str, dict]:
     return entries
 
 
+def _tag_label(tag: Tag) -> str:
+    """A tag's name: its class name, or the member name for a built-in tag
+    (`IsPad`, `IsVia`, ...)."""
+    return tag.value if isinstance(tag, BuiltinTag) else repr(tag)
+
+
+def _tag_names(*objs) -> list[str]:
+    """Tags assigned directly to any of `objs` (`SomeTag().assign(obj)`), by
+    tag class name. jitx stores them as a `Tags` property on the object
+    itself; a tag on a container (component, circuit, landpattern) also
+    applies to every copper object inside it - the export records where
+    the tag was assigned and leaves that inheritance to the consumer."""
+    names: list[str] = []
+    for obj in objs:
+        tags = Tags.get(obj)
+        if tags is not None:
+            names += [_tag_label(t) for t in tags.tags if _tag_label(t) not in names]
+    return names
+
+
+def _tag_type(tag: Tag) -> dict:
+    """A tag's place in the tag hierarchy: a rule on a tag also matches every
+    subclass of it, so a consumer needs the ancestors to match rules."""
+    if isinstance(tag, BuiltinTag):
+        return {"parents": [], "doc": None, "builtin": True}
+    cls = tag.__class__
+    parents = [c.__name__ for c in cls.__mro__[1:] if issubclass(c, Tag) and c is not Tag]
+    doc = cls.__doc__ if cls.__doc__ is not Tag.__doc__ else None
+    return {"parents": parents, "doc": doc.strip() if doc else None, "builtin": False}
+
+
+def _jsonable(value):
+    """Best-effort JSON form of a constraint effect: dataclasses become dicts,
+    classes (e.g. a Via type) their name, enums their value, and anything
+    else its str()."""
+    if value is None or isinstance(value, bool | int | float | str):
+        return value
+    if isinstance(value, type):
+        return value.__name__
+    if isinstance(value, Enum):
+        return _jsonable(value.value)
+    if isinstance(value, list | tuple):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if dataclasses.is_dataclass(value):
+        return {f.name: _jsonable(getattr(value, f.name)) for f in dataclasses.fields(value)}
+    return str(value)
+
+
+def _design_rule(trace, rule: DesignConstraint) -> dict:
+    """A `design_constraint(...)` rule: its tag condition(s), as jitx prints
+    the boolean expression, and every effect it sets."""
+    if isinstance(rule, BinaryDesignConstraint):
+        conditions = [rule.first, rule.second]
+        effects = {"clearance": rule.clearance_constraint}
+    elif isinstance(rule, UnaryDesignConstraint):
+        conditions = [rule.condition]
+        effects = {
+            "trace_width": rule.trace_width_constraint,
+            "stitch_via": rule.stitch_via_constraint,
+            "fence_via": rule.fence_via_constraint,
+            "thermal_relief": rule.thermal_relief_constraint,
+            "serpentine_params": rule.serpentine_params_constraint,
+            "coupled_pair_params": rule.coupled_pair_params_constraint,
+            "pour_feature_size": rule.pour_feature_size_constraint,
+            "routing_structure": rule.routing_structure_constraint,
+        }
+    else:
+        conditions, effects = [], {}
+    effects = {k: _jsonable(v) for k, v in effects.items() if v is not None}
+    return {
+        "id": str(trace.path),
+        "name": rule.name,
+        "priority": rule.priority,
+        "kind": "binary" if isinstance(rule, BinaryDesignConstraint) else "unary",
+        "conditions": [str(c) for c in conditions],
+        "condition_trees": [_expr_tree(c) for c in conditions],
+        "effects": effects,
+    }
+
+
+def _expr_tree(expr: BoolExpr) -> dict:
+    """A rule condition as a tree a consumer can evaluate without parsing:
+    {"tag": name} (plus "layer" for OnLayer), {"not": x}, {"and": [a, b]},
+    {"or": [a, b]}, or {"any": true} for a condition that matches everything."""
+    if isinstance(expr, AtomExpr):
+        node: dict = {"tag": _tag_label(expr.atom)}
+        if isinstance(expr.atom, OnLayer):
+            node["layer"] = expr.atom.index
+        return node
+    if isinstance(expr, NotExpr):
+        return {"not": _expr_tree(expr.expr)}
+    if isinstance(expr, AndExpr):
+        return {"and": [_expr_tree(expr.left), _expr_tree(expr.right)]}
+    if isinstance(expr, OrExpr):
+        return {"or": [_expr_tree(expr.left), _expr_tree(expr.right)]}
+    if isinstance(expr, TrueExpr):
+        return {"any": True}
+    return {"expr": str(expr)}
+
+
+def _expr_tags(expr: BoolExpr) -> list[Tag]:
+    """Every tag named in a rule condition."""
+    if isinstance(expr, AtomExpr):
+        return [expr.atom]
+    if isinstance(expr, NotExpr):
+        return _expr_tags(expr.expr)
+    if isinstance(expr, AndExpr | OrExpr):
+        return _expr_tags(expr.left) + _expr_tags(expr.right)
+    return []
+
+
 def _same_pose(a: dict, b: dict, tol: float = 1e-4) -> bool:
     return (
         math.dist(a["center"], b["center"]) <= tol
@@ -364,6 +494,7 @@ def _collect(
             "placement": _pose(_compose(trace.transform, circuit.transform)),
             "floating": bool((declared or {}).get(str(trace.path), {}).get("floating")),
             "relative": (declared or {}).get(str(trace.path), {}).get("relative"),
+            "tags": _tag_names(circuit),
         }
         for trace, circuit in visit(design.root, Circuit)
     ]
@@ -412,6 +543,7 @@ def _collect(
                     "net": net["name"] if net else None,
                     "shapes": _padshapes(coppers, ref) if geometry else None,
                     "layers": sorted({c.layer for c in coppers}),
+                    "tags": _tag_names(pad),
                 }
             )
 
@@ -429,6 +561,8 @@ def _collect(
                 "mpn": comp.mpn,
                 "manufacturer": comp.manufacturer,
                 "def_name": Proxy.type(comp).__name__,
+                # tags on the component or its landpattern (they tag every pad)
+                "tags": _tag_names(comp, *extract(comp, Landpattern)),
                 "placement": pose or False,
                 # See declared_placements: fixed = global `.at(...)` (hold it);
                 # relative = rigid offset from another part or module (lock them
@@ -462,6 +596,7 @@ def _collect(
                 "start_layer": layers.normalize(span[0]) if span[0] is not None else None,
                 "stop_layer": layers.normalize(span[1]) if span[1] is not None else None,
                 "net": net["name"] if net else None,
+                "tags": _tag_names(via),
             }
         )
 
@@ -499,6 +634,7 @@ def _collect(
                 "layer": layers.normalize(pour.layer),
                 "rank": pour.rank,
                 "isolate": pour.isolate,
+                "tags": _tag_names(pour),
                 "owned": owned,
                 "shape": shape if geometry else [],
                 "extent": _extent(shape),
@@ -512,6 +648,35 @@ def _collect(
     for ref, xform, pour in net_only:
         if id(pour) not in owned_ids:
             add_pour(ref, xform, pour, owned=False)
+
+    # A net's tags are the union over every Net object merged into it.
+    for net_obj in extract(design.root, Net):
+        entry = net_of(net_obj)
+        if entry is not None:
+            entry.setdefault("tags", [])
+            entry["tags"] += [t for t in _tag_names(net_obj) if t not in entry["tags"]]
+    for entry in entries.values():
+        entry.setdefault("tags", [])
+
+    rule_objs = list(visit(design.root, DesignConstraint))
+    rules = [_design_rule(trace, rule) for trace, rule in rule_objs]
+
+    # Every tag used anywhere - on an object or in a rule condition -
+    # with its ancestors, so rules on a parent tag can be matched.
+    used: list[Tag] = []
+    for _trace, holder in visit(
+        design.root, (Net, Pour, Component, Circuit, Landpattern, Pad, Via)
+    ):
+        tags = Tags.get(holder)
+        used += tags.tags if tags is not None else []
+    for _trace, rule in rule_objs:
+        if isinstance(rule, BinaryDesignConstraint):
+            used += _expr_tags(rule.first) + _expr_tags(rule.second)
+        elif isinstance(rule, UnaryDesignConstraint):
+            used += _expr_tags(rule.condition)
+    tag_types: dict[str, dict] = {}
+    for tag in used:
+        tag_types.setdefault(_tag_label(tag), _tag_type(tag))
 
     netlist = sorted(entries.values(), key=lambda n: (n["name"] is None, n["name"]))
     for index, net in enumerate(netlist):
@@ -569,6 +734,8 @@ def _collect(
             "short_traces": len(shorts),
             "vias": len(vias),
             "pours": len(pours),
+            "design_rules": len(rules),
+            "tag_types": len(tag_types),
         },
         "board_shape": board if geometry else [],
         "board_shape_native": board_native if geometry else None,
@@ -578,6 +745,8 @@ def _collect(
         "short_traces": shorts,
         "vias": vias,
         "pours": pours,
+        "tag_types": dict(sorted(tag_types.items())),
+        "design_rules": rules,
     }
 
 
@@ -650,6 +819,8 @@ def _report(data: dict) -> str:
             + (f"   [RELATIVE to {comp['relative']['to']}]" if comp["relative"] else "")
             + (f"   mfr {comp['manufacturer']}" if comp["manufacturer"] else ""),
         ]
+        if comp["tags"]:
+            out.append(f"      tags    {', '.join(comp['tags'])}")
         if comp["moved_from_declared"]:
             out.append(f"      code    {_place(comp['declared_placement'])}   [MOVED]")
         if comp["courtyard_extent"]:
@@ -672,6 +843,8 @@ def _report(data: dict) -> str:
             counts += "   [SHORT TRACE]"
         if net.get("pour"):
             counts += "   [POUR]"
+        if net["tags"]:
+            counts += f"   tags {', '.join(net['tags'])}"
         out.append(f"  {net['id']:<24} {counts}")
         out += _refs(net["pads"], " " * 6)
         out += _refs([f"via {v}" for v in net["vias"]], " " * 6)
@@ -704,6 +877,15 @@ def _report(data: dict) -> str:
             + ("" if p["owned"] else "   [NET-ONLY]")
             for p in data["pours"]
         ]
+
+    if data["design_rules"]:
+        out += ["", f"DESIGN RULES  {len(data['design_rules'])}"]
+        for rule in data["design_rules"]:
+            effects = ", ".join(f"{k} {v}" for k, v in rule["effects"].items()) or "-"
+            out.append(
+                f"  {rule['name'] or rule['id']:<32} prio {rule['priority']:<3}"
+                f" when {' , '.join(rule['conditions'])}  ->  {effects}"
+            )
 
     out += ["", f"MODULES  {len(data['modules'])}"]
     children = defaultdict(list)
