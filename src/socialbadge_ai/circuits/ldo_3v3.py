@@ -31,13 +31,13 @@ class LDO_3V3(Circuit):
         self.VIN += self.vin.Vp + self.u1.VIN + self.u1.EN  # EN tied to VIN
         self.V3V3 += self.vout.Vp + self.u1.VOUT
 
-        self.c_in = Capacitor(capacitance=1.0e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_in = Capacitor(capacitance=1.0e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_in_nets = [
             ShortTrace(self.c_in.p1, self.u1.VIN),
             ShortTrace(self.c_in.p2, self.u1.GND),
         ]
 
-        self.c_out = Capacitor(capacitance=1.0e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_out = Capacitor(capacitance=1.0e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_out_nets = [
             ShortTrace(self.c_out.p1, self.u1.VOUT),
             ShortTrace(self.c_out.p2, self.u1.GND),

@@ -31,7 +31,7 @@ class MCP73831T_2ACI_OT(jitx.Component):
     reference_designator_prefix = "U"
     # Verified against the real LCSC/EasyEDA footprint: our pad cloud aligns
     # pin-for-pin (same numbering) under a 270 deg correction, residual 0.09mm.
-    lcsc = LCSCPart("C424093", orientation=270.0)
+    lcsc = LCSCPart("C424093")
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/c7ec00710e742b7fb9393e620ae1332b.pdf"
 
     STAT = Port()   # Pin 1 — tri-state status output

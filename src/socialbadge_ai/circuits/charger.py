@@ -44,13 +44,13 @@ class Charger(Circuit):
         self.V3V3 += self.v3v3.Vp
 
         # Input/output bulk caps per datasheet
-        self.c_vdd = Capacitor(capacitance=4.7e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_vdd = Capacitor(capacitance=4.7e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_vdd_nets = [
             ShortTrace(self.c_vdd.p1, self.u1.VDD),
             ShortTrace(self.c_vdd.p2, self.u1.VSS),
         ]
 
-        self.c_vbat = Capacitor(capacitance=4.7e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_vbat = Capacitor(capacitance=4.7e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_vbat_nets = [
             ShortTrace(self.c_vbat.p1, self.u1.VBAT),
             ShortTrace(self.c_vbat.p2, self.u1.VSS),

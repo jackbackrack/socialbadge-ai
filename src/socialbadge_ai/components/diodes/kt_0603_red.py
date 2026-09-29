@@ -13,7 +13,7 @@ from jitx.shapes.composites import rectangle
 from jitx.shapes.primitive import Arc, ArcPolyline, Polyline, Text
 from jitx.anchor import Anchor
 from jitxlib.jlcpcb import LCSCPart
-from jitxlib.symbols.box import BoxSymbol, PinGroup, Row, Column
+from jitxlib.symbols.box import BoxSymbol, PinGroup, Row
 
 
 # ======================================================================
@@ -44,8 +44,8 @@ _pad_A = Pad1().at(0.75, -0)
 class _Landpattern(Landpattern):
     name = "easyeda2kicad:LED-SMD_L1.6-W0.8-R-RD"
     p = {
-        1: _pad_K,
-        2: _pad_A,
+        1: _pad_A,
+        2: _pad_K,
     }
     reference_designator = Silkscreen(Text(">REF", 1, Anchor.W).at((0, 4)))
     value_label = Custom(Text(">VALUE", 1, Anchor.W).at((0, -4)), name="Fab")
@@ -81,12 +81,12 @@ class KT_0603R(jitx.Component):
     # exporter falls back to matching pad number labels — which would silently
     # pair our cathode with their anode. Pinned to the value verified by
     # same-polarity position matching instead.
-    lcsc = LCSCPart("C2286", orientation=0.0)
+    lcsc = LCSCPart("C2286")
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/011ec3e8cb1e825f6961d29bc4db4c7a.pdf"
 
     # --- Ports ---
-    K = Port()  # Pad "K"
     A = Port()  # Pad "A"
+    K = Port()  # Pad "K"
 
     landpattern = _Landpattern
 
@@ -101,8 +101,8 @@ class KT_0603R(jitx.Component):
         # --- Pad Mapping ---
         lp = self.landpattern
         self.pad_mapping = PadMapping({
-            self.K: lp.p[1],
-            self.A: lp.p[2],
+            self.A: lp.p[1],
+            self.K: lp.p[2],
         })
 
 
