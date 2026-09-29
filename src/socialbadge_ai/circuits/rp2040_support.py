@@ -80,7 +80,7 @@ class RP2040Support(Circuit):
         # case="0402" (vs. the 0402/0603/0805 design-wide default) so these fit
         # in the tight pin-adjacent placement around the RP2040 QFN-56.
         self.c_iovdd = [
-            Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+            Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
             for _ in range(6)
         ]
         self.c_iovdd_nets = [
@@ -90,49 +90,49 @@ class RP2040Support(Circuit):
         ]
 
         # 100 nF on ADC_AVDD, USB_VDD
-        self.c_adc_avdd = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_adc_avdd = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_adc_avdd_nets = [
             ShortTrace(self.c_adc_avdd.p1, self.mcu.ADC_AVDD),
             ShortTrace(self.c_adc_avdd.p2, self.mcu.GND),
         ]
 
-        self.c_usb_vdd = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_usb_vdd = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_usb_vdd_nets = [
             ShortTrace(self.c_usb_vdd.p1, self.mcu.USB_VDD),
             ShortTrace(self.c_usb_vdd.p2, self.mcu.GND),
         ]
 
         # 1 uF bulk + 100 nF HF on VREG_VIN
-        self.c_vreg_vin_bulk = Capacitor(capacitance=1.0e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_vreg_vin_bulk = Capacitor(capacitance=1.0e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_vreg_vin_bulk_nets = [
             ShortTrace(self.c_vreg_vin_bulk.p1, self.mcu.VREG_VIN),
             ShortTrace(self.c_vreg_vin_bulk.p2, self.mcu.GND),
         ]
-        self.c_vreg_vin_hf = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_vreg_vin_hf = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_vreg_vin_hf_nets = [
             ShortTrace(self.c_vreg_vin_hf.p1, self.mcu.VREG_VIN),
             ShortTrace(self.c_vreg_vin_hf.p2, self.mcu.GND),
         ]
 
         # 1 uF on VREG_VOUT (also feeds DVDD) + 100 nF per DVDD pin
-        self.c_vreg_vout = Capacitor(capacitance=1.0e-6 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X5R")
+        self.c_vreg_vout = Capacitor(capacitance=1.0e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_vreg_vout_nets = [
             ShortTrace(self.c_vreg_vout.p1, self.mcu.VREG_VOUT),
             ShortTrace(self.c_vreg_vout.p2, self.mcu.GND),
         ]
-        self.c_dvdd0 = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_dvdd0 = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_dvdd0_nets = [
             ShortTrace(self.c_dvdd0.p1, self.mcu.DVDD[0]),
             ShortTrace(self.c_dvdd0.p2, self.mcu.GND),
         ]
-        self.c_dvdd1 = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_dvdd1 = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_dvdd1_nets = [
             ShortTrace(self.c_dvdd1.p1, self.mcu.DVDD[1]),
             ShortTrace(self.c_dvdd1.p2, self.mcu.GND),
         ]
 
         # 100 nF on flash VCC
-        self.c_flash_vcc = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R", case="0402")
+        self.c_flash_vcc = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_flash_vcc_nets = [
             ShortTrace(self.c_flash_vcc.p1, self.flash.VCC),
             ShortTrace(self.c_flash_vcc.p2, self.flash.GND),
@@ -146,9 +146,9 @@ class RP2040Support(Circuit):
         self.XOUT += self.mcu.XOUT + self.xtal.OSC2
 
         # Crystal load caps — NOT short_trace (placement is per the crystal datasheet)
-        self.c_xin = Capacitor(capacitance=27e-12 * F, rated_voltage=50.0 * V, temperature_coefficient_code="C0G")
+        self.c_xin = Capacitor(capacitance=27e-12 * F, rated_voltage_dc=50.0 * V, temperature_coefficient_code="C0G")
         self.c_xin_nets = [self.c_xin.p1 + self.mcu.XIN, self.c_xin.p2 + self.mcu.GND]
-        self.c_xout = Capacitor(capacitance=27e-12 * F, rated_voltage=50.0 * V, temperature_coefficient_code="C0G")
+        self.c_xout = Capacitor(capacitance=27e-12 * F, rated_voltage_dc=50.0 * V, temperature_coefficient_code="C0G")
         self.c_xout_nets = [self.c_xout.p1 + self.mcu.XOUT, self.c_xout.p2 + self.mcu.GND]
 
         # --- TESTEN tied to GND ---
@@ -175,7 +175,7 @@ class RP2040Support(Circuit):
         self.RUN += self.mcu.RUN
         self.r_run_pu = Resistor(resistance=10e3 * ohm)
         self.r_run_pu_nets = [self.r_run_pu.p1 + self.mcu.RUN, self.r_run_pu.p2 + self.V3V3]
-        self.c_run_debounce = Capacitor(capacitance=100e-9 * F, rated_voltage=10.0 * V, temperature_coefficient_code="X7R")
+        self.c_run_debounce = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R")
         self.c_run_debounce_nets = [
             self.c_run_debounce.p1 + self.mcu.RUN,
             self.c_run_debounce.p2 + self.mcu.GND,

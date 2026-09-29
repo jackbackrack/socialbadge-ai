@@ -28,7 +28,7 @@ class AP2112K_33TRG1(jitx.Component):
     reference_designator_prefix = "U"
     # Verified against the real LCSC/EasyEDA footprint: our pad cloud aligns
     # pin-for-pin (same numbering) under a 270 deg correction, residual 0.08mm.
-    lcsc = LCSCPart("C51118", orientation=270.0)
+    lcsc = LCSCPart("C51118")
     datasheet = "https://datasheet.lcsc.com/datasheet/pdf/5b29baebdc4332b382a530ff21092301.pdf"
 
     VIN = Port()         # Pin 1
