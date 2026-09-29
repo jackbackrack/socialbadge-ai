@@ -24,6 +24,7 @@ import math
 import sys
 import textwrap
 from collections import defaultdict
+from collections.abc import Mapping
 from enum import Enum
 from typing import Any
 
@@ -57,6 +58,7 @@ from jitx.placement import Placement
 from jitx.run.runtime import RuntimeDesign
 from jitx.shapes import primitive
 from jitx.shapes.shapely import ShapelyGeometry
+from jitx.si import Constrain, RoutingStructureConstraint
 from jitx.transform import Transform
 from jitx.via import Via
 
@@ -456,6 +458,67 @@ def _expr_tags(expr: BoolExpr) -> list[Tag]:
     return []
 
 
+# Built-in tags that hold for a routed trace segment of a net.
+_TRACE_BUILTINS = frozenset({"IsCopper", "IsTrace"})
+
+
+def _tag_closure(tags: list[Tag]) -> frozenset[str]:
+    """The tag names a trace of a net carrying `tags` matches: each tag, its
+    ancestor tags (a rule on a parent tag matches subclasses) and the
+    built-in trace tags."""
+    names = set(_TRACE_BUILTINS)
+    for tag in tags:
+        names.add(_tag_label(tag))
+        names.update(_tag_type(tag)["parents"])
+    return frozenset(names)
+
+
+def _matches(expr: BoolExpr, names: frozenset[str], layer: int, normalize) -> bool:
+    """Whether a rule condition holds for a trace with tag set `names` on
+    (normalized) conductor `layer`."""
+    if isinstance(expr, AtomExpr):
+        if isinstance(expr.atom, OnLayer):
+            return normalize(expr.atom.index) == layer
+        return _tag_label(expr.atom) in names
+    if isinstance(expr, NotExpr):
+        return not _matches(expr.expr, names, layer, normalize)
+    if isinstance(expr, AndExpr):
+        return _matches(expr.left, names, layer, normalize) and _matches(
+            expr.right, names, layer, normalize
+        )
+    if isinstance(expr, OrExpr):
+        return _matches(expr.left, names, layer, normalize) or _matches(
+            expr.right, names, layer, normalize
+        )
+    return isinstance(expr, TrueExpr)
+
+
+def _best(candidates):
+    """The winning (value, source) among matching rules: highest priority,
+    ties going to the first defined. `candidates` is (priority, value, source)."""
+    best = None
+    for priority, value, source in candidates:
+        if best is None or priority > best[0]:
+            best = (priority, value, source)
+    return (best[1], best[2]) if best else (None, None)
+
+
+def _per_layer(values: Mapping[int, float | None]):
+    """A per-layer value, compressed: a single number when every layer agrees,
+    else {"default": commonest, "<layer>": value, ...} for the layers that
+    differ. None when nothing is set."""
+    present = {k: v for k, v in values.items() if v is not None}
+    if not present:
+        return None
+    distinct = list(present.values())
+    if len(set(distinct)) == 1 and len(present) == len(values):
+        return distinct[0]
+    common = max(set(distinct), key=distinct.count)
+    out: dict[str, float] = {"default": common}
+    out.update({str(k): v for k, v in present.items() if v != common})
+    return out
+
+
 def _same_pose(a: dict, b: dict, tol: float = 1e-4) -> bool:
     return (
         math.dist(a["center"], b["center"]) <= tol
@@ -486,6 +549,12 @@ def _collect(
         if group is None:
             return None
         return entries.setdefault(id(group), {"name": group.name, "pads": [], "vias": []})
+
+    def existing_net(element) -> dict | None:
+        """The entry of a net already in the export, never adding one - for
+        lookups that shouldn't create empty nets (tags, routing structures)."""
+        group = nets.find(element)
+        return entries.get(id(group)) if group is not None else None
 
     modules = [
         {
@@ -651,7 +720,7 @@ def _collect(
 
     # A net's tags are the union over every Net object merged into it.
     for net_obj in extract(design.root, Net):
-        entry = net_of(net_obj)
+        entry = existing_net(net_obj)
         if entry is not None:
             entry.setdefault("tags", [])
             entry["tags"] += [t for t in _tag_names(net_obj) if t not in entry["tags"]]
@@ -678,9 +747,167 @@ def _collect(
     for tag in used:
         tag_types.setdefault(_tag_label(tag), _tag_type(tag))
 
+    # ---- routing widths and clearances -------------------------------
+    # What jitx itself knows, resolved per net and per conductor layer:
+    #   * fab minimums on the substrate (the floor for everything),
+    #   * design rules: `design_constraint(cond).trace_width(w)` and
+    #     `design_constraint(a, b).clearance(c)`, matched against the net's
+    #     tags (+ ancestors, OnLayer, built-in trace tags), highest priority
+    #     winning,
+    #   * routing structures applied to signal topologies with
+    #     `Constrain(...).structure(rs)`, which override rules on their nets.
+    fab = design.root.substrate.constraints
+    n_layers = len(design.root.substrate.stackup.conductors)
+    all_layers = range(n_layers)
+    norm = layers.normalize
+    width_rules = [
+        (r.priority, r.trace_width_constraint.width, f"rule {t.path}", r.condition)
+        for t, r in rule_objs
+        if isinstance(r, UnaryDesignConstraint) and r.trace_width_constraint is not None
+    ]
+    clearance_rules = [
+        (r.priority, r.clearance_constraint.clearance, f"rule {t.path}", r.first, r.second)
+        for t, r in rule_objs
+        if isinstance(r, BinaryDesignConstraint) and r.clearance_constraint is not None
+    ]
+
+    net_tag_objs: dict[int, list[Tag]] = defaultdict(list)
+    for net_obj in extract(design.root, Net):
+        entry = existing_net(net_obj)
+        tags = Tags.get(net_obj)
+        if entry is not None and tags is not None:
+            net_tag_objs[id(entry)] += tags.tags
+    closures = {id(e): _tag_closure(net_tag_objs[id(e)]) for e in entries.values()}
+    untagged = _tag_closure([])
+    every = [*closures.values(), untagged]
+
+    def width_on(names, layer):
+        return _best(
+            (p, w, src) for p, w, src, cond in width_rules if _matches(cond, names, layer, norm)
+        )
+
+    def everywhere(side, layer) -> bool:
+        return all(_matches(side, n, layer, norm) for n in every)
+
+    def clearance_on(names, layer):
+        # rules pitting this net against every net - a per-net clearance
+        return _best(
+            (p, c, src)
+            for p, c, src, a, b in clearance_rules
+            if (_matches(a, names, layer, norm) and everywhere(b, layer))
+            or (_matches(b, names, layer, norm) and everywhere(a, layer))
+        )
+
+    def value_of(pick):
+        return {layer: pick(layer)[0] for layer in all_layers}
+
+    def source_of(pick):
+        return sorted({s for L in all_layers if (s := pick(L)[1]) is not None}) or None
+
+    default_width = value_of(lambda L: width_on(untagged, L))
+    default_clear = value_of(lambda L: clearance_on(untagged, L))
+    rules_summary = {
+        "trace_width": _per_layer(
+            {L: v if v is not None else fab.min_copper_width for L, v in default_width.items()}
+        ),
+        "clearance": _per_layer(
+            {
+                L: v if v is not None else fab.min_copper_copper_space
+                for L, v in default_clear.items()
+            }
+        ),
+        "min_trace_width": fab.min_copper_width,
+        "min_clearance": fab.min_copper_copper_space,
+        "min_copper_edge_space": fab.min_copper_edge_space,
+        "min_copper_hole_space": fab.min_copper_hole_space,
+        "sources": {
+            "trace_width": source_of(lambda L: width_on(untagged, L)) or ["fab minimum"],
+            "clearance": source_of(lambda L: clearance_on(untagged, L)) or ["fab minimum"],
+        },
+    }
+
+    for entry in entries.values():
+        names = closures[id(entry)]
+        entry["trace_width"] = entry["clearance"] = None
+        entry["rule_sources"] = None
+        if names == untagged:
+            continue  # nothing tag-specific: the defaults apply
+        width = value_of(lambda L, n=names: width_on(n, L))
+        clear = value_of(lambda L, n=names: clearance_on(n, L))
+        if width != default_width:
+            entry["trace_width"] = _per_layer(width)
+        if clear != default_clear:
+            entry["clearance"] = _per_layer(clear)
+        if entry["trace_width"] is not None or entry["clearance"] is not None:
+            entry["rule_sources"] = {
+                "trace_width": source_of(lambda L, n=names: width_on(n, L)),
+                "clearance": source_of(lambda L, n=names: clearance_on(n, L)),
+            }
+
+    # Routing structures on signal topologies override rules for their nets.
+    constrains = {str(t.path): c for t, c in visit(design.root, Constrain)}
+    for trace, rsc in visit(design.root, RoutingStructureConstraint):
+        owner = _owner(str(trace.path), list(constrains))
+        if owner is None:
+            continue
+        structure = rsc.structure
+        widths = {norm(k): lay.trace_width for k, lay in structure.layers.items()}
+        clears = {norm(k): lay.clearance for k, lay in structure.layers.items()}
+        for topology in constrains[owner].topologies:
+            for end in (topology.begin, topology.end):
+                for port in (end, *extract(end, Port)):
+                    entry = existing_net(port)
+                    if entry is None:
+                        continue
+                    # only the structure's layers are routable: no "default"
+                    entry["trace_width"] = {str(k): v for k, v in sorted(widths.items())}
+                    if any(v is not None for v in clears.values()):
+                        entry["clearance"] = {
+                            str(k): v for k, v in sorted(clears.items()) if v is not None
+                        }
+                    entry["routing_structure"] = structure.name
+                    entry["rule_sources"] = {
+                        "trace_width": [f"routing structure {structure.name}"],
+                        "clearance": [f"routing structure {structure.name}"]
+                        if any(v is not None for v in clears.values())
+                        else None,
+                    }
+                    entry["routing_layers"] = sorted(widths)
+
     netlist = sorted(entries.values(), key=lambda n: (n["name"] is None, n["name"]))
     for index, net in enumerate(netlist):
         net["id"] = net["name"] or f"net#{index}"
+
+    # Clearance rules that depend on BOTH nets (neither side matches every
+    # net) can't be a per-net number; list the net pairs they bind.
+    net_clearances = []
+    pair_rules = [
+        rule
+        for rule in clearance_rules
+        if not any(everywhere(side, L) for side in rule[3:] for L in all_layers)
+    ]
+    if pair_rules:
+        for i, na in enumerate(netlist):
+            for nb in netlist[i + 1 :]:
+                ca, cb = closures[id(na)], closures[id(nb)]
+                picks = {
+                    L: _best(
+                        (p, c, src)
+                        for p, c, src, a, b in pair_rules
+                        if (_matches(a, ca, L, norm) and _matches(b, cb, L, norm))
+                        or (_matches(a, cb, L, norm) and _matches(b, ca, L, norm))
+                    )
+                    for L in all_layers
+                }
+                value = _per_layer({L: v for L, (v, _s) in picks.items()})
+                if value is not None:
+                    net_clearances.append(
+                        {
+                            "nets": [na["id"], nb["id"]],
+                            "clearance": value,
+                            "source": sorted({s for _v, s in picks.values() if s is not None}),
+                        }
+                    )
 
     shorts = []
     short_traces = list(visit(design.root, ShortTrace))
@@ -746,6 +973,8 @@ def _collect(
         "vias": vias,
         "pours": pours,
         "tag_types": dict(sorted(tag_types.items())),
+        "rules": rules_summary,
+        "net_clearances": net_clearances,
         "design_rules": rules,
     }
 
