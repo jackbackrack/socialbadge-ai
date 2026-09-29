@@ -747,11 +747,6 @@ def _collect(
                     "turns": [list(p) for p in points[1:-1]],
                     "end": list(points[-1]),
                 }
-            shape: list[dict] = []
-            for rt in route.traces or ():
-                for rshape in rt.shapes:
-                    s = trace.transform * rshape if trace.transform is not None else rshape
-                    shape += _polys(s, ref)
             routes.append(
                 {
                     "id": ref,
@@ -760,8 +755,6 @@ def _collect(
                     "source": endpoint_ref(route.source),
                     "destination": endpoint_ref(route.destination),
                     "sketch": sketch,
-                    "shape": shape if geometry else [],
-                    "extent": _extent(shape),
                 }
             )
 
