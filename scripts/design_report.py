@@ -191,20 +191,41 @@ def _extent(polys) -> list[float] | None:
     return [min(xs), min(ys), max(xs), max(ys)]
 
 
-def _stackup_entries(stackup: Any) -> list[dict]:
+def _covers_board(extent: list[float] | None, board_extent: list[float] | None, tol=0.95) -> bool:
+    """Whether `extent` covers at least `tol` of the board's own bounding
+    area -- a cheap stand-in for "this pour is a plane", since a plane pour's
+    extent is the board (or very nearly it) and a smaller keepout/fill isn't."""
+    if not extent or not board_extent:
+        return False
+    ex0, ey0, ex1, ey1 = extent
+    bx0, by0, bx1, by1 = board_extent
+    board_area = (bx1 - bx0) * (by1 - by0)
+    if board_area <= 0:
+        return False
+    return (ex1 - ex0) * (ey1 - ey0) / board_area >= tol
+
+
+def _stackup_entries(
+    stackup: Any, routes: list[dict], pours: list[dict], board_extent: list[float] | None
+) -> list[dict]:
     """Every conductor layer, top to bottom, index 0..N-1 matching the layer
     numbers everywhere else in this file (pad/via/pour/route "layer"
     fields). jitx's own Conductor/Stackup classes have no notion of "signal"
     vs. "plane" layer -- that's a per-design usage convention, not a stackup
-    property, so a consumer wanting that distinction should look at which
-    layers this design's pours/routes actually land on (both already in this
-    report) rather than expect it here. This is the physical layer list: what
-    layer indices exist and what they're made of."""
+    property, so this doesn't invent a single verdict (this design's own top
+    and bottom layers are both routed *and* carry a full-board GND fill, so
+    "has a plane-sized pour" alone would misclassify them as planes). Instead,
+    each entry also reports how many of this report's own "routes" and
+    "pours" land on it, and whether any of those pours are (near enough)
+    board-sized -- cheap to compute, since routes/pours are already collected
+    by this point, and enough for a consumer to infer signal vs. plane
+    itself with whatever threshold suits it."""
     conductors = stackup.conductors
     n = len(conductors)
     entries = []
     for i, conductor in enumerate(conductors):
         side = "top" if i == 0 else "bottom" if i == n - 1 else "inner"
+        layer_pours = [p for p in pours if p["layer"] == i]
         entries.append(
             {
                 "layer": i,
@@ -213,6 +234,11 @@ def _stackup_entries(stackup: Any) -> list[dict]:
                 # jitx: "If not specified, the name of the class is used."
                 "material": conductor.material_name or Proxy.type(conductor).__name__,
                 "thickness": conductor.thickness,
+                "routes": sum(1 for r in routes if r["layer"] == i),
+                "pours": len(layer_pours),
+                "full_board_pour": any(
+                    _covers_board(p["extent"], board_extent) for p in layer_pours
+                ),
             }
         )
     return entries
@@ -1075,7 +1101,7 @@ def _collect(
     )
     board = _polys(board_shape, "board")
     board_native = _circle_entry(board_shape)
-    stackup = _stackup_entries(design.root.substrate.stackup)
+    stackup = _stackup_entries(design.root.substrate.stackup, routes, pours, _extent(board))
     return {
         "design": design.name,
         "summary": {
@@ -1154,7 +1180,10 @@ def _report(data: dict) -> str:
         f"  board       {_span(s['board_extent'])}",
         f"  stackup     {s['conductor_layers']} conductor layers: "
         + ", ".join(
-            f"{c['layer']} ({c['side']}, {c['material']}, {c['thickness']}mm)"
+            f"{c['layer']} ({c['side']}, {c['material']}, {c['thickness']}mm, "
+            f"{c['routes']} routes, {c['pours']} pours"
+            + (", full-board pour" if c["full_board_pour"] else "")
+            + ")"
             for c in data["stackup"]
         ),
         f"  contents    {s['modules']} modules, {s['components']} components "
