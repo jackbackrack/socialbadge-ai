@@ -191,6 +191,32 @@ def _extent(polys) -> list[float] | None:
     return [min(xs), min(ys), max(xs), max(ys)]
 
 
+def _stackup_entries(stackup: Any) -> list[dict]:
+    """Every conductor layer, top to bottom, index 0..N-1 matching the layer
+    numbers everywhere else in this file (pad/via/pour/route "layer"
+    fields). jitx's own Conductor/Stackup classes have no notion of "signal"
+    vs. "plane" layer -- that's a per-design usage convention, not a stackup
+    property, so a consumer wanting that distinction should look at which
+    layers this design's pours/routes actually land on (both already in this
+    report) rather than expect it here. This is the physical layer list: what
+    layer indices exist and what they're made of."""
+    conductors = stackup.conductors
+    n = len(conductors)
+    entries = []
+    for i, conductor in enumerate(conductors):
+        side = "top" if i == 0 else "bottom" if i == n - 1 else "inner"
+        entries.append(
+            {
+                "layer": i,
+                "side": side,
+                "name": conductor.name,
+                "material": conductor.material_name,
+                "thickness": conductor.thickness,
+            }
+        )
+    return entries
+
+
 def _pose(xform: Transform | None) -> dict | None:
     if xform is None:
         return None
@@ -1040,10 +1066,11 @@ def _collect(
     )
     board = _polys(board_shape, "board")
     board_native = _circle_entry(board_shape)
+    stackup = _stackup_entries(design.root.substrate.stackup)
     return {
         "design": design.name,
         "summary": {
-            "conductor_layers": len(design.root.substrate.stackup.conductors),
+            "conductor_layers": len(stackup),
             "board_extent": _extent(board),
             "modules": len(modules),
             "components": len(components),
@@ -1064,6 +1091,7 @@ def _collect(
         },
         "board_shape": board if geometry else [],
         "board_shape_native": board_native if geometry else None,
+        "stackup": stackup,
         "modules": modules,
         "components": components,
         "nets": netlist,
@@ -1115,7 +1143,11 @@ def _report(data: dict) -> str:
     out = [
         f"DESIGN  {data['design']}",
         f"  board       {_span(s['board_extent'])}",
-        f"  stackup     {s['conductor_layers']} conductor layers",
+        f"  stackup     {s['conductor_layers']} conductor layers: "
+        + ", ".join(
+            f"{c['layer']} ({c['side']}, {c['material']}, {c['thickness']}mm)"
+            for c in data["stackup"]
+        ),
         f"  contents    {s['modules']} modules, {s['components']} components "
         f"({s['unplaced_components']} unplaced, {s['fixed_components']} fixed by code, "
         f"{s['relative_components']} relative, "
