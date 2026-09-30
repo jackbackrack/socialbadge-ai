@@ -210,7 +210,8 @@ def _stackup_entries(stackup: Any) -> list[dict]:
                 "layer": i,
                 "side": side,
                 "name": conductor.name,
-                "material": conductor.material_name,
+                # jitx: "If not specified, the name of the class is used."
+                "material": conductor.material_name or Proxy.type(conductor).__name__,
                 "thickness": conductor.thickness,
             }
         )
@@ -385,8 +386,6 @@ def declared_pour_shapes(design: RuntimeDesign) -> dict[int, Any]:
     than one the design declared) has no entry here -- there is no "before"
     for it, declared and computed are the same thing.
     """
-    from jitx.copper import Pour
-
     shapes: dict[int, Any] = {}
     for _trace, pour in design.query(Pour):
         shapes.setdefault(id(pour), pour.shape)
@@ -746,6 +745,16 @@ def _collect(
     # has already produced, not the code-authored kind (this design has none
     # of those) -- reverse-flow synthesizes one per routed segment, complete
     # with .traces (the actual copper) once the design has been captured.
+    #
+    # "sketch" below is doubly provisional: it reads the private
+    # `route.sketch._points()` (no public accessor exists), and on top of
+    # that, for these reverse-flow-synthesized routes the values it returns
+    # are frequently wrong -- segment lengths that don't match the real
+    # distance between the resolved endpoints, not just a coordinate-frame
+    # issue. These Route objects don't exist at all pre-capture, so this
+    # looks like a bug in jitx's own reverse-flow linker. Treat "sketch" as
+    # unverified until that's understood; id/net/layer/source/destination
+    # are reliable.
     routes = []
     route_objs = list(design.query(Route))
     if route_objs:
