@@ -398,6 +398,16 @@ def declared_placements(design: RuntimeDesign) -> dict[str, dict]:
     return entries
 
 
+def declared_vias(design: RuntimeDesign) -> set[int]:
+    """`id()` of every via the design code itself declared (and so placed
+    with `.at()`), for the "fixed" flag. Call this after `submit` and BEFORE
+    `capture`: capture gives every via a transform, including the ones the
+    reverse-flow linker / router synthesizes (e.g. `..._Capture__link.vias[n]`),
+    so a transform alone does not mean code placed it. Via identity survives
+    capture, as pours' does."""
+    return {id(via) for _trace, via in visit(design.root, Via)}
+
+
 def declared_pour_shapes(design: RuntimeDesign) -> dict[int, Any]:
     """Every `Pour`'s shape exactly as declared in code, keyed by `id(pour)`.
     Call this after `submit` and BEFORE `capture`: capture replaces a pour's
@@ -613,6 +623,38 @@ def _side_hint(comp, declared_pose: dict | None) -> str | None:
     return declared_pose.get("side") if declared_pose else None
 
 
+def _via_definitions(design: RuntimeDesign, layers: RuntimeDesign.Layers) -> list[dict]:
+    """Every via type the layout tool may need: the substrate's declared via
+    definitions (what a router may add) plus any other type the design
+    places. Sizes in mm; layers normalized like everything else."""
+    types: dict[str, type] = {}
+    substrate_cls = Proxy.type(design.root.substrate)
+    for name in dir(substrate_cls):
+        obj = getattr(substrate_cls, name, None)
+        if isinstance(obj, type) and issubclass(obj, Via):
+            types.setdefault(obj.__name__, obj)
+    for _, via in visit(design.root, Via):
+        cls = Proxy.type(via)
+        types.setdefault(cls.__name__, cls)
+
+    def layer(value):
+        return layers.normalize(value) if value is not None else None
+
+    return [
+        {
+            "name": name,
+            "pad_diameter": getattr(cls, "diameter", None),
+            "drill_diameter": getattr(cls, "hole_diameter", None),
+            "start_layer": layer(getattr(cls, "start_layer", None)),
+            "stop_layer": layer(getattr(cls, "stop_layer", None)),
+            "tented": getattr(cls, "tented", None),
+            "filled": getattr(cls, "filled", None),
+            "via_in_pad": getattr(cls, "via_in_pad", None),
+        }
+        for name, cls in sorted(types.items())
+    ]
+
+
 def _same_pose(a: dict, b: dict, tol: float = 1e-4) -> bool:
     return (
         math.dist(a["center"], b["center"]) <= tol
@@ -629,6 +671,7 @@ def _collect(
     geometry: bool,
     declared: dict[str, dict] | None = None,
     declared_pours: dict[int, Any] | None = None,
+    declared_via_ids: set[int] | None = None,
 ) -> dict:
     nets: RuntimeDesign.Nets = _member(design, "nets")
     layers: RuntimeDesign.Layers = _member(design, "layers")
@@ -755,17 +798,37 @@ def _collect(
         if net is not None:
             net["vias"].append(ref)
         span = [getattr(via, name, None) for name in ("start_layer", "stop_layer")]
+        # A via the design code declared (present before capture, see
+        # declared_vias) is locked like a fixed component -- future-layout
+        # reads the top-level "fixed". Vias the reverse-flow linker / router
+        # synthesized during capture are free (fixed False, placed_by None).
+        # A via the layout importer created (layout_placements.LayoutToolVia)
+        # belongs to the layout tool: free, and exported under the tool's id.
+        via_tags = Tags.get(via)
+        tool_id = None
+        for tag in via_tags.tags if via_tags is not None else ():
+            tool_id = getattr(tag, "layout_id", None)
+            if tool_id is not None:
+                break
+        if declared_via_ids is not None:
+            declared_via = id(via) in declared_via_ids
+        else:  # no pre-capture snapshot: reverse-flow vias live under a capture link
+            declared_via = "_Capture__" not in ref
+        code_placed = declared_via and via.transform is not None and tool_id is None
         vias.append(
             {
-                "id": ref,
+                "id": tool_id if tool_id is not None else ref,
                 "def_name": Proxy.type(via).__name__,
                 "pose": _pose(_compose(trace.transform, via.transform)),
                 "start_layer": layers.normalize(span[0]) if span[0] is not None else None,
                 "stop_layer": layers.normalize(span[1]) if span[1] is not None else None,
                 "net": net["name"] if net else None,
+                "fixed": code_placed,
+                "placed_by": "at" if code_placed else None,
                 "tags": _tag_names(via),
             }
         )
+    via_definitions = _via_definitions(design, layers)
 
     # Resolved routing: real Route objects the router (interactive or auto)
     # has already produced, not the code-authored kind (this design has none
@@ -1119,6 +1182,8 @@ def _collect(
             "named_nets": sum(1 for n in netlist if n["name"]),
             "short_traces": len(shorts),
             "vias": len(vias),
+            "fixed_vias": sum(1 for v in vias if v["fixed"]),
+            "via_definitions": len(via_definitions),
             "routes": len(routes),
             "pours": len(pours),
             "design_rules": len(rules),
@@ -1132,6 +1197,7 @@ def _collect(
         "nets": netlist,
         "short_traces": shorts,
         "vias": vias,
+        "via_definitions": via_definitions,
         "routes": routes,
         "pours": pours,
         "tag_types": dict(sorted(tag_types.items())),
@@ -1318,9 +1384,15 @@ def export(
     geometry: bool = True,
     declared: dict[str, dict] | None = None,
     declared_pours: dict[int, Any] | None = None,
+    declared_via_ids: set[int] | None = None,
 ) -> None:
     data = _collect(
-        design, design_cls, geometry=geometry, declared=declared, declared_pours=declared_pours
+        design,
+        design_cls,
+        geometry=geometry,
+        declared=declared,
+        declared_pours=declared_pours,
+        declared_via_ids=declared_via_ids,
     )
     paths = [
         f"{out}.{ext}" if out else _out_path(design, "design-report", ext)
@@ -1349,8 +1421,16 @@ def main() -> None:
         d = r.submit(cls)
         declared = declared_placements(d)  # before capture overwrites them
         declared_pours = declared_pour_shapes(d)  # before capture computes the fill
+        declared_via_ids = declared_vias(d)  # before capture adds router vias
         d.capture()
-        export(d, cls, out=out, declared=declared, declared_pours=declared_pours)
+        export(
+            d,
+            cls,
+            out=out,
+            declared=declared,
+            declared_pours=declared_pours,
+            declared_via_ids=declared_via_ids,
+        )
 
 
 if __name__ == "__main__":

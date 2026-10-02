@@ -21,6 +21,14 @@ jitx 4.4/4.5 to defer to): a JSON object with an optional ``board_shape``
      "layer": <int>,
      "sketch": {"start": [x, y], "turns": [[x, y], ...], "end": [x, y]}}
 
+Each component and via may carry ``"fixed": true`` (placed by the design
+code with ``.at()``); fixed entries are written for reference and skipped on
+import, so the code placement always wins. A ``vias`` list holds
+``{"id", "def_name", "pose": {"center", "angle", "flip_x", "side"},
+"start_layer", "stop_layer", "net", "fixed"}``: an ``id`` naming a design via
+moves it; any other ``id`` is a via the layout tool added, created from the
+substrate's ``def_name`` via definition on the named ``net``.
+
 ``sketch`` may also be a bare list of >= 2 points (``[start, *turns, end]``),
 and may be omitted for a route with no path hint. ``source``/``destination``
 are paths the same way a component's ``id`` is, but to a ``Port`` or ``Pad``
@@ -43,18 +51,21 @@ from pathlib import Path
 from typing import Any
 
 from jitx import current
+from jitx._structural import Proxy  # same as design_report.py: real class of a proxied instance
 from jitx.circuit import Route
 from jitx.component import Component
+from jitx.constraints import Tag, Tags
 from jitx.inspect import visit
 from jitx.landpattern import Pad
 from jitx.layerindex import Side
-from jitx.net import Port
+from jitx.net import Net, Port, SubNet
 from jitx.placement import Placement
 from jitx.refpath import Item, RefPath
 from jitx.shapes import Shape
 from jitx.shapes.composites import rectangle
 from jitx.shapes.primitive import Polygon
 from jitx.transform import Point, Transform
+from jitx.via import Via
 from shapely.geometry import Polygon as ShapelyPolygon
 
 logger = getLogger(__name__)
@@ -114,8 +125,12 @@ def layout_placements(filename: str | Path) -> None:
     if board is not None:
         design.board.shape = _parse_board(board)
     for entry in data.get("components", ()):
+        if entry.get("fixed"):
+            continue  # code placement wins
         name = entry["id"]
-        placement = entry["placement"]
+        placement = entry.get("placement")
+        if placement is None:
+            continue
         try:
             component = parse_refpath(name).access(design)
         except (AttributeError, LookupError, ValueError) as e:
@@ -130,6 +145,7 @@ def layout_placements(filename: str | Path) -> None:
                 on=side,
             ),
         )
+    _import_vias(design, data.get("vias", ()))
     for entry in data.get("routes", ()):
         try:
             source = parse_refpath(entry["source"]).access(design)
@@ -169,19 +185,163 @@ def _write_layout(path: Path) -> None:
             if trace.transform is not None:
                 xform = trace.transform * xform
             entry["placement"] = _placement_entry(xform)
+            entry["fixed"] = True
         components.append(entry)
     routes = _route_entries(design)
+    vias = _via_entries(design)
     with open(path, "w") as file:
         json.dump(
             {
                 "board_shape": _board_entry(design.board.shape),
                 "components": components,
+                "vias": vias,
                 "routes": routes,
             },
             file,
             indent=2,
         )
         file.write("\n")
+
+
+class LayoutToolVia(Tag):
+    """Marks a via created from a layout file: it is the layout tool's (free,
+    not code-placed) and keeps the tool's ``layout_id`` so the next export
+    round-trips it under the same id."""
+
+    def __init__(self, layout_id: str) -> None:
+        super().__init__()
+        self.layout_id = layout_id
+
+
+def layout_tool_via_id(via: Via) -> str | None:
+    """The layout-file id of a via created by :py:func:`layout_placements`,
+    or ``None`` for a via the design code declared."""
+    tags = Tags.get(via)
+    for tag in tags.tags if tags is not None else ():
+        if isinstance(tag, LayoutToolVia):
+            return tag.layout_id
+    return None
+
+
+def _via_nets(design: Any) -> dict[int, Net]:
+    nets: dict[int, Net] = {}
+    for _, net in visit(design, Net):
+        if not isinstance(net, Net) or isinstance(net, SubNet):
+            continue  # bundle sub-nets carry no vias
+        for member in net.connected:
+            if isinstance(member, Via):
+                nets.setdefault(id(member), net)
+    return nets
+
+
+def _layer_index(design: Any, layer: int | None) -> int | None:
+    """Normalize a (possibly negative, from-the-bottom) layer index the way
+    the design-report exporter does: 0 is the top conductor."""
+    if layer is None:
+        return None
+    return layer % len(design.substrate.stackup.conductors)
+
+
+def _via_entries(design: Any) -> list[dict[str, Any]]:
+    nets = _via_nets(design)
+    entries: list[dict[str, Any]] = []
+    for trace, via in visit(design, Via):
+        if via.transform is None:
+            continue
+        xform: Transform = via.transform
+        if trace.transform is not None:
+            xform = trace.transform * xform
+        net = nets.get(id(via))
+        tool_id = layout_tool_via_id(via)
+        entries.append(
+            {
+                "id": tool_id if tool_id is not None else str(trace.path),
+                "def_name": Proxy.type(via).__name__,
+                "pose": _placement_entry(xform),
+                "start_layer": _layer_index(design, via.start_layer),
+                "stop_layer": _layer_index(design, via.stop_layer),
+                "net": net.name if net is not None else None,
+                "fixed": tool_id is None,
+            }
+        )
+    return entries
+
+
+def _via_types(design: Any) -> dict[str, type[Via]]:
+    types: dict[str, type[Via]] = {}
+    substrate = Proxy.type(design.substrate)
+    for name in dir(substrate):
+        obj = getattr(substrate, name, None)
+        if isinstance(obj, type) and issubclass(obj, Via):
+            types.setdefault(obj.__name__, obj)
+    for _, via in visit(design, Via):
+        cls = Proxy.type(via)
+        types.setdefault(cls.__name__, cls)
+    return types
+
+
+def _names_design_object(design: Any, path: RefPath) -> bool:
+    """Whether ``path`` starts at an attribute of the design (e.g.
+    ``circuit...``), as opposed to a layout tool's own via name."""
+    steps = list(path.steps)
+    if not steps or not isinstance(steps[0], str):
+        return False
+    return hasattr(design, steps[0])
+
+
+def _import_vias(design: Any, entries: Any) -> None:
+    """Move free design vias and create the vias the layout tool added."""
+    types: dict[str, type[Via]] | None = None
+    nets: dict[str, Net] | None = None
+    for entry in entries:
+        if entry.get("fixed"):
+            continue  # code placement wins
+        pose = entry["pose"]
+        side = _SIDES[str(pose.get("side", "Top")).lower()]
+        center = _parse_point(pose["center"])
+        angle = float(pose.get("angle", 0.0))
+        layout_id = str(entry["id"])
+        try:
+            path = parse_refpath(layout_id)
+        except ValueError:
+            path = None
+        if path is not None and _names_design_object(design, path):
+            # The id is a path into the design. A design via found there is
+            # moved; one that doesn't exist yet is a via the backend
+            # (reverse-flow linker / router) synthesizes during capture, e.g.
+            # "circuit.usb._Capture__link.vias[0]" -- echoed back by the
+            # layout tool, not something to create (that duplicates it).
+            try:
+                existing = path.access(design)
+            except (AttributeError, LookupError, ValueError):
+                existing = None
+            if isinstance(existing, Via):
+                existing.at(center, on=side, rotate=angle)
+            else:
+                logger.debug("Skipping layout via %s: not a pre-capture design via", layout_id)
+            continue
+        if types is None:
+            types = _via_types(design)
+            nets = {
+                n.name: n
+                for _, n in visit(design, Net)
+                if isinstance(n, Net) and not isinstance(n, SubNet) and n.name
+            }
+        assert nets is not None
+        cls = types.get(str(entry.get("def_name")))
+        net = nets.get(str(entry.get("net")))
+        if cls is None or net is None:
+            logger.error(
+                "Skipping layout via %s: unknown via definition %r or net %r",
+                entry.get("id"),
+                entry.get("def_name"),
+                entry.get("net"),
+            )
+            continue
+        via = cls().at(center, on=side, rotate=angle)
+        LayoutToolVia(layout_id).assign(via)
+        net += via
+        design.circuit += via
 
 
 def _route_entries(design: Any) -> list[dict[str, Any]]:
