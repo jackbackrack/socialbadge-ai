@@ -333,6 +333,28 @@ def _padshapes(coppers, where) -> list[dict]:
     return [{"shape": p, "layers": sorted(ls)} for p, ls in groups.values()]
 
 
+def _frame(
+    circuits: dict[str, Circuit], circuit_paths: list[str], path: str, local: Transform | None
+) -> tuple[str | None, Transform | None]:
+    """(anchor, pose relative to it) for `local` (something's placement/
+    transform, expressed in the frame of whatever structural path owns it)
+    walked up to the frame of the circuit that owns `path`: walk up until the
+    board (anchor None) or the first floating circuit (its frame is the
+    anchor). Shared by declared_placements (for components) and declared_vias
+    (for vias) -- the fixed/relative distinction is the same question for
+    both: is there a floating or place()-d circuit between this and the
+    board?"""
+    xform = local
+    owner = _owner(path, circuit_paths)
+    while owner is not None:
+        parent = circuits[owner].transform
+        if parent is None:
+            return owner, xform
+        xform = _compose(parent, xform)
+        owner = _owner(owner, circuit_paths)
+    return None, xform
+
+
 def declared_placements(design: RuntimeDesign) -> dict[str, dict]:
     """How the design code placed each component and module, keyed by path.
     Call this after `submit` and BEFORE `capture`: capture overwrites
@@ -361,25 +383,11 @@ def declared_placements(design: RuntimeDesign) -> dict[str, dict]:
     paths: dict[int, str] = {id(o): p for p, o in (*circuits.items(), *comps.items())}
     circuit_paths = list(circuits)
 
-    def frame(path: str, local: Transform | None) -> tuple[str | None, Transform | None]:
-        """(anchor, pose relative to it) for `local` expressed in the frame of the
-        circuit that owns `path`: walk up until the board (anchor None) or the
-        first floating circuit (its frame is the anchor)."""
-        xform = local
-        owner = _owner(path, circuit_paths)
-        while owner is not None:
-            parent = circuits[owner].transform
-            if parent is None:
-                return owner, xform
-            xform = _compose(parent, xform)
-            owner = _owner(owner, circuit_paths)
-        return None, xform
-
     entries: dict[str, dict] = {}
     for path, comp in comps.items():
         if comp.transform is None:
             continue
-        anchor, xform = frame(path, comp.transform)
+        anchor, xform = _frame(circuits, circuit_paths, path, comp.transform)
         entries[path] = {
             "placed_by": "at",
             "fixed": anchor is None,
@@ -396,7 +404,7 @@ def declared_placements(design: RuntimeDesign) -> dict[str, dict]:
         if other is not None and id(other) in paths:
             anchor, xform = paths[id(other)], request.placement
         else:
-            anchor, xform = frame(str(trace.path), request.placement)
+            anchor, xform = _frame(circuits, circuit_paths, str(trace.path), request.placement)
         entries[path] = {
             "placed_by": "place",
             "fixed": False,
@@ -434,14 +442,30 @@ def declared_placements(design: RuntimeDesign) -> dict[str, dict]:
     return entries
 
 
-def declared_vias(design: RuntimeDesign) -> set[int]:
-    """`id()` of every via the design code itself declared (and so placed
-    with `.at()`), for the "fixed" flag. Call this after `submit` and BEFORE
-    `capture`: capture gives every via a transform, including the ones the
-    reverse-flow linker / router synthesizes (e.g. `..._Capture__link.vias[n]`),
-    so a transform alone does not mean code placed it. Via identity survives
-    capture, as pours' does."""
-    return {id(via) for _trace, via in visit(design.root, Via)}
+def declared_vias(design: RuntimeDesign) -> dict[int, dict]:
+    """Every via the design code itself placed with `.at()` before capture,
+    keyed by `id(via)`, as {"fixed", "relative"} -- the same fixed/relative
+    distinction and the same `_frame` walk declared_placements uses for
+    components: fixed only for a global `.at()` (no floating or place()-d
+    circuit between the via and the board); relative (to that circuit's own
+    frame) otherwise. A via absent here has no local `.at()` of its own --
+    not placed by code, free to move like any router-added via. Call this
+    after `submit` and BEFORE `capture`: capture gives every via a transform,
+    including the ones the reverse-flow linker / router synthesizes (e.g.
+    `..._Capture__link.vias[n]`), so a transform alone does not mean code
+    placed it. Via identity survives capture, as pours' does."""
+    circuits: dict[str, Circuit] = {str(t.path): c for t, c in visit(design.root, Circuit)}
+    circuit_paths = list(circuits)
+    entries: dict[int, dict] = {}
+    for trace, via in visit(design.root, Via):
+        if via.transform is None:
+            continue
+        anchor, xform = _frame(circuits, circuit_paths, str(trace.path), via.transform)
+        entries[id(via)] = {
+            "fixed": anchor is None,
+            "relative": None if anchor is None else {"to": anchor, "pose": _pose(xform)},
+        }
+    return entries
 
 
 def declared_pour_shapes(design: RuntimeDesign) -> dict[int, Any]:
@@ -707,7 +731,7 @@ def _collect(
     geometry: bool,
     declared: dict[str, dict] | None = None,
     declared_pours: dict[int, Any] | None = None,
-    declared_via_ids: set[int] | None = None,
+    declared_via_info: dict[int, dict] | None = None,
 ) -> dict:
     nets: RuntimeDesign.Nets = _member(design, "nets")
     layers: RuntimeDesign.Layers = _member(design, "layers")
@@ -811,7 +835,11 @@ def _collect(
             placed = xf * mark.shape
             silkscreen.append(
                 {
-                    "id": str(t.path),
+                    # A true dotted path (component id + relative path), so
+                    # it round-trips through parse_refpath -- unlike pads'
+                    # "pad_id"/"ref" elsewhere in this file, which are
+                    # slash-style display strings, not resolvable paths.
+                    "id": _child(cid, str(t.path)),
                     "side": mark.side.name,
                     "shape": _polys(placed, t.path),
                     "text": _text_info(placed, comp.reference_designator, comp_value),
@@ -857,22 +885,27 @@ def _collect(
             net["vias"].append(ref)
         span = [getattr(via, name, None) for name in ("start_layer", "stop_layer")]
         # A via the design code declared (present before capture, see
-        # declared_vias) is locked like a fixed component -- future-layout
-        # reads the top-level "fixed". Vias the reverse-flow linker / router
-        # synthesized during capture are free (fixed False, placed_by None).
-        # A via the layout importer created (layout_placements.LayoutToolVia)
-        # belongs to the layout tool: free, and exported under the tool's id.
+        # declared_vias) gets the same fixed/relative distinction as a
+        # component (declared_vias runs it through the same _frame walk).
+        # Vias the reverse-flow linker / router synthesized during capture
+        # are free (fixed False, relative None). Without a pre-capture
+        # snapshot there's no way to tell them apart at all, so every via is
+        # "unknown" -- free, like any other via neither side vouches for --
+        # rather than guessing from its path.
+        # A via the layout importer created is tagged with something exposing
+        # a `layout_id` (e.g. layout_placements.LayoutToolVia in this
+        # project): it belongs to the layout tool, free, exported under the
+        # tool's own id so re-importing it moves the same via instead of
+        # creating a duplicate.
         via_tags = Tags.get(via)
         tool_id = None
         for tag in via_tags.tags if via_tags is not None else ():
             tool_id = getattr(tag, "layout_id", None)
             if tool_id is not None:
                 break
-        if declared_via_ids is not None:
-            declared_via = id(via) in declared_via_ids
-        else:  # no pre-capture snapshot: reverse-flow vias live under a capture link
-            declared_via = "_Capture__" not in ref
-        code_placed = declared_via and via.transform is not None and tool_id is None
+        declared_via = (declared_via_info or {}).get(id(via))
+        fixed = declared_via is not None and declared_via["fixed"] and tool_id is None
+        relative = declared_via["relative"] if declared_via is not None and tool_id is None else None
         vias.append(
             {
                 "id": tool_id if tool_id is not None else ref,
@@ -881,8 +914,9 @@ def _collect(
                 "start_layer": layers.normalize(span[0]) if span[0] is not None else None,
                 "stop_layer": layers.normalize(span[1]) if span[1] is not None else None,
                 "net": net["name"] if net else None,
-                "fixed": code_placed,
-                "placed_by": "at" if code_placed else None,
+                "fixed": fixed,
+                "relative": relative,
+                "placed_by": "at" if fixed or relative is not None else None,
                 "tags": _tag_names(via),
             }
         )
@@ -1285,6 +1319,7 @@ def _collect(
             "short_traces": len(shorts),
             "vias": len(vias),
             "fixed_vias": sum(1 for v in vias if v["fixed"]),
+            "relative_vias": sum(1 for v in vias if v["relative"]),
             "via_definitions": len(via_definitions),
             "routes": len(routes),
             "pours": len(pours),
@@ -1509,7 +1544,7 @@ def export(
     geometry: bool = True,
     declared: dict[str, dict] | None = None,
     declared_pours: dict[int, Any] | None = None,
-    declared_via_ids: set[int] | None = None,
+    declared_via_info: dict[int, dict] | None = None,
 ) -> None:
     data = _collect(
         design,
@@ -1517,7 +1552,7 @@ def export(
         geometry=geometry,
         declared=declared,
         declared_pours=declared_pours,
-        declared_via_ids=declared_via_ids,
+        declared_via_info=declared_via_info,
     )
     paths = [
         f"{out}.{ext}" if out else _out_path(design, "design-report", ext)
@@ -1546,7 +1581,7 @@ def main() -> None:
         d = r.submit(cls)
         declared = declared_placements(d)  # before capture overwrites them
         declared_pours = declared_pour_shapes(d)  # before capture computes the fill
-        declared_via_ids = declared_vias(d)  # before capture adds router vias
+        declared_via_info = declared_vias(d)  # before capture adds router vias
         d.capture()
         export(
             d,
@@ -1554,7 +1589,7 @@ def main() -> None:
             out=out,
             declared=declared,
             declared_pours=declared_pours,
-            declared_via_ids=declared_via_ids,
+            declared_via_info=declared_via_info,
         )
 
 
