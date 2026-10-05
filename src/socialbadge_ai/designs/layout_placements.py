@@ -37,6 +37,22 @@ matching everything else in the file. A route sketch is a hint for JITX's own
 routing engine, not a resolved copper path -- see
 :py:class:`~jitx.circuit.Route.Sketch`.
 
+An optional ``ref_designators`` list holds poses for reference-designator (or
+other) silkscreen text labels, one entry per mark:
+``{"id": <path, matching design_report.py's per-component "silkscreen[].id">,
+"position": [x, y], "angle": <degrees>}``. Despite being a class-level
+declarative field (``reference_designator = Silkscreen(...)`` on a
+landpattern, not an instance attribute set in ``__init__`` like a pad or a
+via), this resolves and repositions fine via the same ``parse_refpath`` +
+``.at(...)`` this module already uses elsewhere -- verified end to end
+against a real, previously-built design: position and rotation both land
+correctly and survive capture. (An *unestablished*, first-ever-built
+throwaway design hit "Encountered a deferred instantiable attribute on an
+instantiated object" attempting the same resolution; that looks like a
+first-build/stabilization quirk specific to a brand new design name, not a
+property of silkscreen features as a category -- if a producer somehow hits
+that same error on a design that has never built before, retry once it has.)
+
 Written by :py:func:`layout_placements` itself (see ``_write_layout``) and
 read back the same way, so any producer just needs to match that shape.
 """
@@ -161,6 +177,23 @@ def layout_placements(filename: str | Path) -> None:
         design.circuit += Route(
             source, destination, int(entry["layer"]), sketch=_parse_sketch(entry.get("sketch"))
         )
+    _import_ref_designators(design, data.get("ref_designators", ()))
+
+
+def _import_ref_designators(design: Any, entries: Any) -> None:
+    """Apply a pose to a reference-designator (or other) silkscreen mark, by
+    resolving its path (see this module's own docstring) and repositioning
+    its shape -- the same `parse_refpath` + `.at(...)` approach used for
+    routes and vias, which turns out to work for this too, despite being a
+    class-level declarative field rather than an instance attribute."""
+    for entry in entries:
+        try:
+            mark = parse_refpath(entry["id"]).access(design)
+        except (AttributeError, LookupError, ValueError) as e:
+            logger.error("Unable to find ref designator mark %s in layout: %s", entry.get("id"), e)
+            continue
+        angle = float(entry.get("angle", 0.0))
+        mark.shape = mark.shape.at(_parse_point(entry["position"]), rotate=angle)
 
 
 def _parse_sketch(entry: Any) -> Route.Sketch | list[Point] | None:
