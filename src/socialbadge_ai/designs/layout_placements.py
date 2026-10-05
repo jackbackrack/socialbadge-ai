@@ -197,7 +197,7 @@ def _owning_component(mark_id: str, component_placements: Mapping[str, Placement
     owners = [
         c
         for c in component_placements
-        if mark_id != c and (mark_id.startswith(f"{c}.") or mark_id.startswith(f"{c}["))
+        if mark_id != c and mark_id.startswith((f"{c}.", f"{c}["))
     ]
     return max(owners, key=len, default=None)
 

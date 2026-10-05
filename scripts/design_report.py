@@ -316,7 +316,7 @@ def _owner(path: str, candidates) -> str | None:
     enclosing = [
         c
         for c in candidates
-        if c != path and (path.startswith(f"{c}.") or path.startswith(f"{c}["))
+        if c != path and path.startswith((f"{c}.", f"{c}["))
     ]
     return max(enclosing, key=len, default=None)
 
