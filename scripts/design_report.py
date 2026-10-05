@@ -710,6 +710,7 @@ def _collect(
         module["parent_id"] = _owner(module["id"], module_ids)
 
     components = []
+    component_silk_ids: set[int] = set()
     pad_centers: dict[str, tuple[float, float]] = {}
     pads_of_port: dict[int, list[str]] = defaultdict(list)
     for ctrace, comp in visit(design.root, Component):
@@ -764,10 +765,11 @@ def _collect(
         # is reference designator text, pin-1 markers, outlines etc. baked
         # into the landpattern, so it has to move and rotate with the part,
         # not be looked up again in board coordinates after every move.
+        comp_silk_marks = [(t, mark) for t, mark in visit(comp, Silkscreen) if t.transform is not None]
+        component_silk_ids.update(id(mark) for _t, mark in comp_silk_marks)
         silkscreen = [
             {"side": mark.side.name, "shape": _polys(t.transform * mark.shape, t.path)}
-            for t, mark in visit(comp, Silkscreen)
-            if t.transform is not None
+            for t, mark in comp_silk_marks
         ]
         components.append(
             {
@@ -964,6 +966,27 @@ def _collect(
                 "pour": keepout.pour,
                 "via": keepout.via,
                 "route": keepout.route,
+                "shape": shape if geometry else [],
+                "extent": _extent(shape),
+            }
+        )
+
+    # Silkscreen declared directly on the board/circuit, not baked into any
+    # component's landpattern (a logo, a label, manual board-level artwork) --
+    # the rest already came back per-component, in that component's own local
+    # frame; this is deliberately the opposite: absolute board coordinates,
+    # since it has nothing of its own to move with and a placer needs to see
+    # it in the same frame as everything else fixed to the board.
+    board_silkscreen = []
+    for trace, mark in visit(design.root, Silkscreen):
+        if trace.transform is None or id(mark) in component_silk_ids:
+            continue
+        ref = str(trace.path)
+        shape = _polys(trace.transform * mark.shape, ref)
+        board_silkscreen.append(
+            {
+                "id": ref,
+                "side": mark.side.name,
                 "shape": shape if geometry else [],
                 "extent": _extent(shape),
             }
@@ -1219,6 +1242,7 @@ def _collect(
             "pours": len(pours),
             "keepouts": len(keepouts),
             "silkscreen": sum(len(c["silkscreen"]) for c in components),
+            "board_silkscreen": len(board_silkscreen),
             "design_rules": len(rules),
             "tag_types": len(tag_types),
         },
@@ -1234,6 +1258,7 @@ def _collect(
         "routes": routes,
         "pours": pours,
         "keepouts": keepouts,
+        "board_silkscreen": board_silkscreen,
         "tag_types": dict(sorted(tag_types.items())),
         "rules": rules_summary,
         "net_clearances": net_clearances,
@@ -1292,7 +1317,8 @@ def _report(data: dict) -> str:
         f"{s['moved_from_declared']} moved since), {s['pads']} pads, "
         f"{s['nets']} nets ({s['named_nets']} named), "
         f"{s['short_traces']} short traces, {s['vias']} vias, {s['routes']} routes, {s['pours']} pours, "
-        f"{s['keepouts']} keepouts, {s['silkscreen']} silkscreen marks",
+        f"{s['keepouts']} keepouts, {s['silkscreen']} silkscreen marks "
+        f"({s['board_silkscreen']} board-level)",
         "  note        mm and degrees. `at` is the captured layout; `code` is where the "
         "design code put it,",
         "              shown only when the layout has moved it. A placement is in "
@@ -1395,6 +1421,13 @@ def _report(data: dict) -> str:
             ranges = ", ".join(f"{r['start']}..{r['end']}" for r in k["layers"])
             flags = "".join(f" [{flag}]" for flag in ("pour", "via", "route") if k[flag])
             out.append(f"  {k['id']:<32} {_span(k['extent'])}  layers {ranges}{flags}")
+
+    if data["board_silkscreen"]:
+        out += ["", f"BOARD SILKSCREEN  {len(data['board_silkscreen'])}"]
+        out += [
+            f"  {m['id']:<32} {m['side']:<6} {_span(m['extent'])}"
+            for m in data["board_silkscreen"]
+        ]
 
     if data["design_rules"]:
         out += ["", f"DESIGN RULES  {len(data['design_rules'])}"]
