@@ -93,6 +93,42 @@ def _shapely_from_shape(shape) -> ShapelyGeometry:
     return ShapelyGeometry.from_shape(shape, tolerance=1e-3)
 
 
+def _text_info(shape, ref: str | None, value: str | None) -> dict | None:
+    """If `shape`'s geometry is a `Text` primitive, its actual rendering info
+    (string/size/anchor/position/angle); None for anything else, so this is
+    additive alongside "shape" (which still gets Text's bounding box via
+    `_shapely_from_shape`, for a consumer that only wants that).
+
+    The `Text` object's own `.string` is frequently a literal ">REF"/">VALUE"
+    placeholder even after capture: jitx's reverse-flow linker computes the
+    real reference designator / value, applies it, and then explicitly
+    overwrites the Python-side Text back to the placeholder again (see
+    `apply_ref_labels`/`apply_value_labels` in
+    jitx/_translate/reverse_flow/linker.py) -- so reading `.string` directly
+    silently returns the template, not what the silkscreen actually shows.
+    `ref`/`value` substitute those two placeholders with the real,
+    already-available values (a component's own reference_designator / the
+    same formatted value `_value()` uses elsewhere in this file); pass None
+    for either where there's no owning component (board-level silkscreen).
+    """
+    text = shape.geometry
+    if not isinstance(text, primitive.Text):
+        return None
+    string = text.string
+    if string == ">REF" and ref is not None:
+        string = ref
+    elif string == ">VALUE" and value is not None:
+        string = value
+    (x, y), angle, _scale = shape.transform.trs
+    return {
+        "string": string,
+        "size": text.size,
+        "anchor": text.anchor.name,
+        "position": [round(x, DIGITS), round(y, DIGITS)],
+        "angle": round(angle, DIGITS),
+    }
+
+
 def _out_path(design: RuntimeDesign, stem: str, ext: str = "json") -> str:
     slug = "".join(c if c.isalnum() or c in "-_." else "-" for c in design.name)
     return f"{stem}-{slug}.{ext}"
@@ -769,10 +805,18 @@ def _collect(
             (t, t.transform, mark) for t, mark in visit(comp, Silkscreen) if t.transform is not None
         ]
         component_silk_ids.update(id(mark) for _t, _xf, mark in comp_silk_marks)
-        silkscreen = [
-            {"side": mark.side.name, "shape": _polys(xf * mark.shape, t.path)}
-            for t, xf, mark in comp_silk_marks
-        ]
+        comp_value = _value(comp.value)
+        silkscreen = []
+        for t, xf, mark in comp_silk_marks:
+            placed = xf * mark.shape
+            silkscreen.append(
+                {
+                    "id": str(t.path),
+                    "side": mark.side.name,
+                    "shape": _polys(placed, t.path),
+                    "text": _text_info(placed, comp.reference_designator, comp_value),
+                }
+            )
         components.append(
             {
                 "id": cid,
@@ -984,13 +1028,15 @@ def _collect(
         if trace.transform is None or id(mark) in component_silk_ids:
             continue
         ref = str(trace.path)
-        shape = _polys(trace.transform * mark.shape, ref)
+        placed = trace.transform * mark.shape
+        shape = _polys(placed, ref)
         board_silkscreen.append(
             {
                 "id": ref,
                 "side": mark.side.name,
                 "shape": shape if geometry else [],
                 "extent": _extent(shape),
+                "text": _text_info(placed, None, None),
             }
         )
 
