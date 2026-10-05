@@ -50,7 +50,7 @@ from jitx.constraints import (
     UnaryDesignConstraint,
 )
 from jitx.copper import Copper, Pour
-from jitx.feature import Courtyard
+from jitx.feature import Courtyard, KeepOut, Silkscreen
 from jitx.inspect import extract, visit
 from jitx.landpattern import Landpattern, Pad, PadMapping
 from jitx.net import Net, Port, ShortTrace
@@ -760,6 +760,15 @@ def _collect(
             if t.transform is not None
             for poly in _polys(t.transform * feature.shape, t.path)
         ]
+        # Component-local (like "pads"/"courtyard" above), not absolute: this
+        # is reference designator text, pin-1 markers, outlines etc. baked
+        # into the landpattern, so it has to move and rotate with the part,
+        # not be looked up again in board coordinates after every move.
+        silkscreen = [
+            {"side": mark.side.name, "shape": _polys(t.transform * mark.shape, t.path)}
+            for t, mark in visit(comp, Silkscreen)
+            if t.transform is not None
+        ]
         components.append(
             {
                 "id": cid,
@@ -786,6 +795,7 @@ def _collect(
                 else not _same_pose(code_pose, pose),
                 "courtyard": courtyard if geometry else [],
                 "courtyard_extent": _extent(courtyard),
+                "silkscreen": silkscreen if geometry else [],
                 "pads": pads,
                 "module_id": _owner(cid, module_ids),
             }
@@ -937,6 +947,27 @@ def _collect(
     for ref, xform, pour in net_only:
         if id(pour) not in owned_ids:
             add_pour(ref, xform, pour, owned=False)
+
+    keepouts = []
+    for trace, keepout in visit(design.root, KeepOut):
+        if trace.transform is None:
+            continue
+        ref = str(trace.path)
+        shape = _polys(trace.transform * keepout.shape, ref)
+        keepouts.append(
+            {
+                "id": ref,
+                "layers": [
+                    {"start": layers.normalize(a), "end": layers.normalize(b)}
+                    for a, b in keepout.layers.ranges
+                ],
+                "pour": keepout.pour,
+                "via": keepout.via,
+                "route": keepout.route,
+                "shape": shape if geometry else [],
+                "extent": _extent(shape),
+            }
+        )
 
     # A net's tags are the union over every Net object merged into it.
     for net_obj in extract(design.root, Net):
@@ -1186,6 +1217,8 @@ def _collect(
             "via_definitions": len(via_definitions),
             "routes": len(routes),
             "pours": len(pours),
+            "keepouts": len(keepouts),
+            "silkscreen": sum(len(c["silkscreen"]) for c in components),
             "design_rules": len(rules),
             "tag_types": len(tag_types),
         },
@@ -1200,6 +1233,7 @@ def _collect(
         "via_definitions": via_definitions,
         "routes": routes,
         "pours": pours,
+        "keepouts": keepouts,
         "tag_types": dict(sorted(tag_types.items())),
         "rules": rules_summary,
         "net_clearances": net_clearances,
@@ -1257,7 +1291,8 @@ def _report(data: dict) -> str:
         f"{s['relative_components']} relative, "
         f"{s['moved_from_declared']} moved since), {s['pads']} pads, "
         f"{s['nets']} nets ({s['named_nets']} named), "
-        f"{s['short_traces']} short traces, {s['vias']} vias, {s['routes']} routes, {s['pours']} pours",
+        f"{s['short_traces']} short traces, {s['vias']} vias, {s['routes']} routes, {s['pours']} pours, "
+        f"{s['keepouts']} keepouts, {s['silkscreen']} silkscreen marks",
         "  note        mm and degrees. `at` is the captured layout; `code` is where the "
         "design code put it,",
         "              shown only when the layout has moved it. A placement is in "
@@ -1290,6 +1325,8 @@ def _report(data: dict) -> str:
             out.append(f"      code    {_place(comp['declared_placement'])}   [MOVED]")
         if comp["courtyard_extent"]:
             out.append(f"      court   {_span(comp['courtyard_extent'])}")
+        if comp["silkscreen"]:
+            out.append(f"      silk    {len(comp['silkscreen'])} marks (see JSON for detail)")
         out.append(f"      pads    {len(pads)}")
         out += [
             f"        {p['pad_id']:<{padw}}  pin {p['pin_id'] or '?':<{pinw}}"
@@ -1351,6 +1388,13 @@ def _report(data: dict) -> str:
             + ("" if p["owned"] else "   [NET-ONLY]")
             for p in data["pours"]
         ]
+
+    if data["keepouts"]:
+        out += ["", f"KEEPOUTS  {len(data['keepouts'])}"]
+        for k in data["keepouts"]:
+            ranges = ", ".join(f"{r['start']}..{r['end']}" for r in k["layers"])
+            flags = "".join(f" [{flag}]" for flag in ("pour", "via", "route") if k[flag])
+            out.append(f"  {k['id']:<32} {_span(k['extent'])}  layers {ranges}{flags}")
 
     if data["design_rules"]:
         out += ["", f"DESIGN RULES  {len(data['design_rules'])}"]
