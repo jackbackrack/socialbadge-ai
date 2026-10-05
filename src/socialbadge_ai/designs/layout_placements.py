@@ -40,9 +40,10 @@ routing engine, not a resolved copper path -- see
 An optional ``ref_designators`` list holds poses for reference-designator (or
 other) silkscreen text labels, one entry per mark:
 ``{"id": <path, matching design_report.py's per-component "silkscreen[].id">,
-"position": [x, y], "angle": <degrees>}``. Despite being a class-level
-declarative field (``reference_designator = Silkscreen(...)`` on a
-landpattern, not an instance attribute set in ``__init__`` like a pad or a
+"position": [x, y], "angle": <degrees>}``, with ``position``/``angle`` in
+absolute board coordinates like everything else here. Despite being a
+class-level declarative field (``reference_designator = Silkscreen(...)`` on
+a landpattern, not an instance attribute set in ``__init__`` like a pad or a
 via), this resolves and repositions fine via the same ``parse_refpath`` +
 ``.at(...)`` this module already uses elsewhere -- verified end to end
 against a real, previously-built design: position and rotation both land
@@ -52,6 +53,12 @@ instantiated object" attempting the same resolution; that looks like a
 first-build/stabilization quirk specific to a brand new design name, not a
 property of silkscreen features as a category -- if a producer somehow hits
 that same error on a design that has never built before, retry once it has.)
+A mark's ``shape``, unlike its exported absolute pose, lives in its owning
+component's landpattern-local frame, so the importer converts the absolute
+pose into that frame using the inverse of the owning component's own board
+placement (looked up by the longest matching id prefix among this file's own
+``components`` entries) -- which also correctly accounts for a bottom-side
+mirror.
 
 Written by :py:func:`layout_placements` itself (see ``_write_layout``) and
 read back the same way, so any producer just needs to match that shape.
@@ -140,27 +147,30 @@ def layout_placements(filename: str | Path) -> None:
     board = data.get("board_shape")
     if board is not None:
         design.board.shape = _parse_board(board)
+    # Every component's board-absolute placement, fixed (code-placed) or not,
+    # keyed by its id -- used below to convert ref-designator poses (given in
+    # absolute board coordinates) into each mark's landpattern-local frame.
+    component_placements: dict[str, Placement] = {}
     for entry in data.get("components", ()):
-        if entry.get("fixed"):
-            continue  # code placement wins
         name = entry["id"]
         placement = entry.get("placement")
         if placement is None:
             continue
+        side = _SIDES[str(placement["side"]).lower()]
+        pose = Placement(
+            _parse_point(placement["center"]),
+            float(placement.get("angle", 0.0)),
+            on=side,
+        )
+        component_placements[name] = pose
+        if entry.get("fixed"):
+            continue  # code placement wins
         try:
             component = parse_refpath(name).access(design)
         except (AttributeError, LookupError, ValueError) as e:
             logger.error("Unable to find %s in layout: %s", name, e)
             continue
-        side = _SIDES[str(placement["side"]).lower()]
-        design.circuit.place(
-            component,
-            Placement(
-                _parse_point(placement["center"]),
-                float(placement.get("angle", 0.0)),
-                on=side,
-            ),
-        )
+        design.circuit.place(component, pose)
     _import_vias(design, data.get("vias", ()))
     for entry in data.get("routes", ()):
         try:
@@ -177,23 +187,57 @@ def layout_placements(filename: str | Path) -> None:
         design.circuit += Route(
             source, destination, int(entry["layer"]), sketch=_parse_sketch(entry.get("sketch"))
         )
-    _import_ref_designators(design, data.get("ref_designators", ()))
+    _import_ref_designators(design, data.get("ref_designators", ()), component_placements)
 
 
-def _import_ref_designators(design: Any, entries: Any) -> None:
+def _owning_component(mark_id: str, component_placements: Mapping[str, Placement]) -> str | None:
+    """The id in ``component_placements`` that owns ``mark_id``, i.e. the
+    longest one of which ``mark_id`` is a dotted/indexed child (mirrors
+    design_report.py's own ``_owner``/``_child`` convention)."""
+    owners = [
+        c
+        for c in component_placements
+        if mark_id != c and (mark_id.startswith(f"{c}.") or mark_id.startswith(f"{c}["))
+    ]
+    return max(owners, key=len, default=None)
+
+
+def _import_ref_designators(
+    design: Any, entries: Any, component_placements: Mapping[str, Placement]
+) -> None:
     """Apply a pose to a reference-designator (or other) silkscreen mark, by
     resolving its path (see this module's own docstring) and repositioning
     its shape -- the same `parse_refpath` + `.at(...)` approach used for
     routes and vias, which turns out to work for this too, despite being a
-    class-level declarative field rather than an instance attribute."""
+    class-level declarative field rather than an instance attribute.
+
+    ``entry["position"]``/``entry["angle"]`` are absolute board coordinates
+    (matching every other pose in this file), but a mark's ``shape`` lives in
+    its owning component's landpattern-local frame -- so the absolute pose is
+    converted into that frame via the inverse of the owning component's own
+    board placement (which also accounts for a bottom-side mirror) before
+    being applied.
+    """
     for entry in entries:
+        mark_id = entry["id"]
         try:
-            mark = parse_refpath(entry["id"]).access(design)
+            mark = parse_refpath(mark_id).access(design)
         except (AttributeError, LookupError, ValueError) as e:
-            logger.error("Unable to find ref designator mark %s in layout: %s", entry.get("id"), e)
+            logger.error("Unable to find ref designator mark %s in layout: %s", mark_id, e)
+            continue
+        owner_id = _owning_component(mark_id, component_placements)
+        if owner_id is None:
+            logger.error("Unable to find owning component of ref designator mark %s", mark_id)
             continue
         angle = float(entry.get("angle", 0.0))
-        mark.shape = mark.shape.at(_parse_point(entry["position"]), rotate=angle)
+        absolute = Transform(_parse_point(entry["position"]), angle)
+        local_target = (~component_placements[owner_id]) * absolute
+        # `Shape.at(t)` sets the new transform to `t * self.transform` (an
+        # *additional* positioning transform), not a replacement -- so the
+        # mark's own already-authored local offset/rotation has to be backed
+        # out first, or it would double up on top of `local_target`.
+        delta = local_target * ~mark.shape.transform
+        mark.shape = mark.shape.at(delta)
 
 
 def _parse_sketch(entry: Any) -> Route.Sketch | list[Point] | None:
