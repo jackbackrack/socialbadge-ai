@@ -41,7 +41,9 @@ An optional ``ref_designators`` list holds poses for reference-designator (or
 other) silkscreen text labels, one entry per mark:
 ``{"id": <path, matching design_report.py's per-component "silkscreen[].id">,
 "position": [x, y], "angle": <degrees>}``, with ``position``/``angle`` in
-absolute board coordinates like everything else here. Despite being a
+absolute board coordinates like everything else here. Reference designators
+are plain silkscreen objects and can be set directly, the same way a
+component's placement can (confirmed with JITX directly) -- despite being a
 class-level declarative field (``reference_designator = Silkscreen(...)`` on
 a landpattern, not an instance attribute set in ``__init__`` like a pad or a
 via), this resolves and repositions fine via the same ``parse_refpath`` +
