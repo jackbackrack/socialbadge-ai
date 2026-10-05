@@ -765,11 +765,13 @@ def _collect(
         # is reference designator text, pin-1 markers, outlines etc. baked
         # into the landpattern, so it has to move and rotate with the part,
         # not be looked up again in board coordinates after every move.
-        comp_silk_marks = [(t, mark) for t, mark in visit(comp, Silkscreen) if t.transform is not None]
-        component_silk_ids.update(id(mark) for _t, mark in comp_silk_marks)
+        comp_silk_marks = [
+            (t, t.transform, mark) for t, mark in visit(comp, Silkscreen) if t.transform is not None
+        ]
+        component_silk_ids.update(id(mark) for _t, _xf, mark in comp_silk_marks)
         silkscreen = [
-            {"side": mark.side.name, "shape": _polys(t.transform * mark.shape, t.path)}
-            for t, mark in comp_silk_marks
+            {"side": mark.side.name, "shape": _polys(xf * mark.shape, t.path)}
+            for t, xf, mark in comp_silk_marks
         ]
         components.append(
             {
