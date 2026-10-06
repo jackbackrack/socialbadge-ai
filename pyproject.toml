@@ -12,6 +12,7 @@ dependencies = [
     "jitxlib-standard>=4.5.0a1",
     "jitxlib-jlcpcb>=4.0.0a1",
     "jitxlib-parts>=2.0.0a2,<3",
+    "jitx-design-tools @ file:///Users/jrb/jitx-design-tools",
 ]
 
 [tool.setuptools.packages.find]
