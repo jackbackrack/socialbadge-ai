@@ -1,7 +1,7 @@
 """
 SocialBadge AI — top-level design.
 
-50 × 50 mm square board with 0.25 mm rounded corners on the JLCPCB 4-layer FR-4
+40 × 40 mm square board with 0.25 mm rounded corners on the JLCPCB 4-layer FR-4
 1080-prepreg stackup (JLC04161H_1080). Combines the USB-C interface, Li-ion
 charger, Schottky power-path, 3.3 V LDO, and RP2040 support circuits into a
 single buildable design.
@@ -16,6 +16,8 @@ Power tree (already documented in ARCHITECTURE.md):
 
 Design rules and passive defaults are tuned for the JLCPCB Standard 4-layer fab class.
 """
+
+import os
 
 from jitx import Circuit, Design, Net, Pour
 from jitx.board import Board
@@ -52,12 +54,12 @@ class GroundTag(Tag):
     """Marks ground nets for the wider-trace rule."""
 
 
-# Board outline — 30.0 × 30.0 mm with 0.25 mm rounded corners.
-BOARD_SHAPE = rectangle(30.0, 30.0, radius=0.25)
+# Board outline — 40.0 × 40.0 mm with 0.25 mm rounded corners.
+BOARD_SHAPE = rectangle(40.0, 40.0, radius=0.25)
 
 
 class BadgeBoard(Board):
-    """30.0 × 30.0 mm board with 0.25 mm rounded corners."""
+    """40.0 × 40.0 mm board with 0.25 mm rounded corners."""
 
     shape = BOARD_SHAPE
 
@@ -196,4 +198,13 @@ class BadgeDesign(Design):
                 PowerTag() | GroundTag(), priority=1
             ).trace_width(0.4),
         ]
-        layout_placements("jitx_export.json")
+        # apply_board_shape=False: jitx_export.json still has the captured
+        # 30mm-era board shape, which would otherwise silently override the
+        # 40mm BOARD_SHAPE above on every build. Component placements from
+        # the file are still replayed.
+        #
+        # Skipped when WARP_LIVE=1: a live warp session pushes placements
+        # directly through rd.layout, and the runtime rejects place() on
+        # anything already placed in code.
+        if os.environ.get("WARP_LIVE") != "1":
+            layout_placements("jitx_export.json", apply_board_shape=False)
