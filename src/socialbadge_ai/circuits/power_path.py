@@ -8,8 +8,10 @@ When USB is unplugged, only the battery diode conducts: SYS = VBAT - V_F ≈ 3.0
 
 from jitx import Circuit, Net
 from jitx.common import Power
+from jitx.net import ShortTrace
 
 from ..components.diodes.mdd_SS14 import SS14
+from ..components.test_points.test_point import TestPoint
 
 
 class PowerPath(Circuit):
@@ -35,6 +37,10 @@ class PowerPath(Circuit):
         self.usb_in_net = [self.vbus.Vp + self.d_usb.A]
         self.bat_in_net = [self.vbat.Vp + self.d_bat.A]
         self.SYS += self.d_usb.K + self.d_bat.K + self.sys.Vp
+
+        # Bring-up test point — SYS, the diode-OR'd rail feeding the LDO.
+        self.tp_sys = TestPoint()
+        self.tp_sys_net = ShortTrace(self.tp_sys.p1, self.d_usb.K)
 
 
 Device = PowerPath

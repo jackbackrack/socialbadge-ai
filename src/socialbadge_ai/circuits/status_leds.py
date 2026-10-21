@@ -18,6 +18,7 @@ from jitx.units import ohm
 from jitxlib.parts import Resistor
 
 from ..components.diodes.kt_0603_red import KT_0603R
+from ..components.test_points.test_point import TestPoint
 
 
 N_LEDS = 3
@@ -47,6 +48,13 @@ class StatusLEDs(Circuit):
                 self.r_leds[i].p2 + self.leds[i].A,
             )
         ]
+
+        # Bring-up test point — GND reference near the LED cluster.
+        # No ShortTrace/via needed: GND has a pour on this same layer
+        # (layer 0) spanning the whole board, so a GND-net pad connects
+        # directly wherever it sits, no copper object required.
+        self.tp_gnd = TestPoint()
+        self.GND += self.tp_gnd.p1
 
 
 Device = StatusLEDs

@@ -19,6 +19,7 @@ from jitxlib.landpatterns.generators.qfn import QFN, QFNLead
 from jitxlib.landpatterns.leads import LeadProfile
 from jitxlib.landpatterns.package import RectanglePackage
 from jitxlib.landpatterns.ipc import DensityLevel
+from jitxlib.landpatterns.pads import SMDPadConfig, WindowSubdivide
 from jitxlib.symbols.box import BoxSymbol, PinGroup, Row, Column
 
 
@@ -88,7 +89,14 @@ class RP2040(jitx.Component):
                 height=Toleranced.min_max(0.8, 0.9),
             )
         )
-        .thermal_pad(rectangle(3.2, 3.2))
+        .thermal_pad(
+            rectangle(3.2, 3.2),
+            # Full-area paste on the exposed pad lets excess solder squeeze
+            # out from under the package during reflow and bridge to a
+            # perimeter pin; window it into a 2x2 grid per Raspberry Pi's
+            # QFN-56 layout guidance instead.
+            config=SMDPadConfig(paste=WindowSubdivide()),
+        )
         .density_level(DensityLevel.C)
     )
 

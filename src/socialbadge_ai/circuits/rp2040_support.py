@@ -28,6 +28,7 @@ from ..components.mcus.raspberry_pi_RP2040 import RP2040
 from ..components.memory.winbond_W25Q128JVEIQ import W25Q128JVEIQ
 from ..components.crystals.yxc_X322512MSB4SI import X322512MSB4SI
 from ..components.buttons.xkb_TS_1187A import TS_1187A_B_A_B
+from ..components.test_points.test_point import TestPoint
 
 
 class RP2040Support(Circuit):
@@ -86,56 +87,56 @@ class RP2040Support(Circuit):
         self.c_iovdd_nets = [
             net
             for i, c in enumerate(self.c_iovdd)
-            for net in (ShortTrace(c.p1, self.mcu.IOVDD[i]), ShortTrace(c.p2, self.mcu.GND))
+            for net in (ShortTrace(c.p1, self.mcu.IOVDD[i]), c.p2 + self.mcu.GND)
         ]
 
         # 100 nF on ADC_AVDD, USB_VDD
         self.c_adc_avdd = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_adc_avdd_nets = [
             ShortTrace(self.c_adc_avdd.p1, self.mcu.ADC_AVDD),
-            ShortTrace(self.c_adc_avdd.p2, self.mcu.GND),
+            self.c_adc_avdd.p2 + self.mcu.GND,
         ]
 
         self.c_usb_vdd = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_usb_vdd_nets = [
             ShortTrace(self.c_usb_vdd.p1, self.mcu.USB_VDD),
-            ShortTrace(self.c_usb_vdd.p2, self.mcu.GND),
+            self.c_usb_vdd.p2 + self.mcu.GND,
         ]
 
         # 1 uF bulk + 100 nF HF on VREG_VIN
         self.c_vreg_vin_bulk = Capacitor(capacitance=1.0e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_vreg_vin_bulk_nets = [
             ShortTrace(self.c_vreg_vin_bulk.p1, self.mcu.VREG_VIN),
-            ShortTrace(self.c_vreg_vin_bulk.p2, self.mcu.GND),
+            self.c_vreg_vin_bulk.p2 + self.mcu.GND,
         ]
         self.c_vreg_vin_hf = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_vreg_vin_hf_nets = [
             ShortTrace(self.c_vreg_vin_hf.p1, self.mcu.VREG_VIN),
-            ShortTrace(self.c_vreg_vin_hf.p2, self.mcu.GND),
+            self.c_vreg_vin_hf.p2 + self.mcu.GND,
         ]
 
         # 1 uF on VREG_VOUT (also feeds DVDD) + 100 nF per DVDD pin
         self.c_vreg_vout = Capacitor(capacitance=1.0e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_vreg_vout_nets = [
             ShortTrace(self.c_vreg_vout.p1, self.mcu.VREG_VOUT),
-            ShortTrace(self.c_vreg_vout.p2, self.mcu.GND),
+            self.c_vreg_vout.p2 + self.mcu.GND,
         ]
         self.c_dvdd0 = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_dvdd0_nets = [
             ShortTrace(self.c_dvdd0.p1, self.mcu.DVDD[0]),
-            ShortTrace(self.c_dvdd0.p2, self.mcu.GND),
+            self.c_dvdd0.p2 + self.mcu.GND,
         ]
         self.c_dvdd1 = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_dvdd1_nets = [
             ShortTrace(self.c_dvdd1.p1, self.mcu.DVDD[1]),
-            ShortTrace(self.c_dvdd1.p2, self.mcu.GND),
+            self.c_dvdd1.p2 + self.mcu.GND,
         ]
 
         # 100 nF on flash VCC
         self.c_flash_vcc = Capacitor(capacitance=100e-9 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X7R", case="0402")
         self.c_flash_vcc_nets = [
             ShortTrace(self.c_flash_vcc.p1, self.flash.VCC),
-            ShortTrace(self.c_flash_vcc.p2, self.flash.GND),
+            self.c_flash_vcc.p2 + self.flash.GND,
         ]
 
         # --- Crystal ---
@@ -208,6 +209,24 @@ class RP2040Support(Circuit):
         self.swclk_net = [self.mcu.SWCLK + self.swclk]
         self.swd_net = [self.mcu.SWD + self.swd]
         self.gpio_passthrough = [self.mcu.GPIO[i] + self.gpio[i] for i in range(30)]
+
+        # --- Bring-up test points, local to the MCU cluster ---
+        # 1V1 (VREG_VOUT): confirms the RP2040's own internal switching
+        # regulator is alive before trusting anything downstream of it.
+        # 3V3 and GND here are deliberately separate from the ones near the
+        # LDO/charger — having both ends of each plane probeable lets a
+        # future short be localized (voltage-drop/current-injection) instead
+        # of just re-confirming it exists, which is all a single pair of
+        # test points on an internally-tied net can ever tell you.
+        self.tp_1v1 = TestPoint()
+        self.tp_v3v3 = TestPoint()
+        self.tp_gnd = TestPoint()
+        self.tp_1v1_net = ShortTrace(self.tp_1v1.p1, self.c_vreg_vout.p1)
+        self.tp_v3v3_net = ShortTrace(self.tp_v3v3.p1, self.c_iovdd[0].p1)
+        # No ShortTrace/via needed here: GND has a pour on this same layer
+        # (layer 0) spanning the whole board, so a GND-net pad connects
+        # directly wherever it sits, no copper object required.
+        self.GND += self.tp_gnd.p1
 
 
 Device = RP2040Support

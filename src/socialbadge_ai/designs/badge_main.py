@@ -41,7 +41,7 @@ from ..circuits.power_path import PowerPath
 from ..circuits.rp2040_support import RP2040Support
 from ..circuits.status_leds import N_LEDS, StatusLEDs
 from ..circuits.usb_c import USB_C
-from jitx_design_tools.layout_placements import layout_placements
+from jitx_warp_integration.layout_placements import layout_placements
 
 from ..components.connectors.shouhan_PH2_2P import PH2_2P
 

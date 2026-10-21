@@ -18,6 +18,7 @@ from jitxlib.parts import Capacitor, Resistor
 
 from ..components.power_linear_regulators.microchip_MCP73831T_2ACI_OT import MCP73831T_2ACI_OT
 from ..components.diodes.kt_0603_red import KT_0603R
+from ..components.test_points.test_point import TestPoint
 
 
 class Charger(Circuit):
@@ -47,13 +48,13 @@ class Charger(Circuit):
         self.c_vdd = Capacitor(capacitance=4.7e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_vdd_nets = [
             ShortTrace(self.c_vdd.p1, self.u1.VDD),
-            ShortTrace(self.c_vdd.p2, self.u1.VSS),
+            self.c_vdd.p2 + self.u1.VSS,
         ]
 
         self.c_vbat = Capacitor(capacitance=4.7e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_vbat_nets = [
             ShortTrace(self.c_vbat.p1, self.u1.VBAT),
-            ShortTrace(self.c_vbat.p2, self.u1.VSS),
+            self.c_vbat.p2 + self.u1.VSS,
         ]
 
         # PROG resistor sets charge current: I = 1000/R_prog = 500 mA at 2k
@@ -74,6 +75,17 @@ class Charger(Circuit):
             self.r_led.p2 + self.led.A,
             self.led.K + self.u1.STAT,
         ]
+
+        # Bring-up test points — VBAT and a GND reference near the USB/charger
+        # cluster, so the power-path diodes and charger can be probed without
+        # relying on component leads.
+        self.tp_vbat = TestPoint()
+        self.tp_gnd = TestPoint()
+        self.tp_vbat_net = ShortTrace(self.tp_vbat.p1, self.u1.VBAT)
+        # No ShortTrace/via needed here: GND has a pour on this same layer
+        # (layer 0) spanning the whole board, so a GND-net pad placed
+        # anywhere on it connects directly, no copper object required.
+        self.GND += self.tp_gnd.p1
 
 
 Device = Charger

@@ -12,6 +12,7 @@ from jitx.units import F, V
 from jitxlib.parts import Capacitor
 
 from ..components.power_linear_regulators.diodes_AP2112K_33TRG1 import AP2112K_33TRG1
+from ..components.test_points.test_point import TestPoint
 
 
 class LDO_3V3(Circuit):
@@ -34,14 +35,18 @@ class LDO_3V3(Circuit):
         self.c_in = Capacitor(capacitance=1.0e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_in_nets = [
             ShortTrace(self.c_in.p1, self.u1.VIN),
-            ShortTrace(self.c_in.p2, self.u1.GND),
+            self.c_in.p2 + self.u1.GND,
         ]
 
         self.c_out = Capacitor(capacitance=1.0e-6 * F, rated_voltage_dc=10.0 * V, temperature_coefficient_code="X5R")
         self.c_out_nets = [
             ShortTrace(self.c_out.p1, self.u1.VOUT),
-            ShortTrace(self.c_out.p2, self.u1.GND),
+            self.c_out.p2 + self.u1.GND,
         ]
+
+        # Bring-up test point — LDO's regulated 3V3 output.
+        self.tp_v3v3 = TestPoint()
+        self.tp_v3v3_net = ShortTrace(self.tp_v3v3.p1, self.u1.VOUT)
 
 
 Device = LDO_3V3

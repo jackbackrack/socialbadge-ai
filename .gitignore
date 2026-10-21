@@ -9,3 +9,7 @@ __pycache__/
 .venv_sync_last
 .claude/settings.local.json
 lcsc.lock.json
+/.scratch/
+/autosave/
+/designs.bak/
+/parts-db/

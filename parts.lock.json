@@ -724,6 +724,62 @@
     "min_assembly_qty": 20,
     "product_url": "https://jlcpcb.com/partdetail/C12246"
    }
+  },
+  {
+   "digest": "7467ef5f6fc1c7a4ecb9f1591124a384ab947a18c236096765d179eba8821095",
+   "chain": "jlcpcb",
+   "lock_scope": "",
+   "query": "resistor(resistance=1000.0 ohm)",
+   "filters": {
+    "resistance": [
+     "Exactly",
+     [
+      "q",
+      "1000.0 ohm"
+     ]
+    ]
+   },
+   "provider": "jlcpcb",
+   "identity": {
+    "mpn": "1206W4J0102T5E",
+    "manufacturer": "UNI-ROYAL(Uniroyal Elec)",
+    "category": "resistor",
+    "provider": "jlcpcb",
+    "attributes": {
+     "case": "1206",
+     "composition": "Thick Film Resistor",
+     "lcsc": "C1469",
+     "library": "extended",
+     "max_power": [
+      "q",
+      "250.0 milliwatt"
+     ],
+     "rated_voltage": [
+      "q",
+      "200.0 volt"
+     ],
+     "resistance": [
+      "q",
+      "1.0 kiloohm"
+     ],
+     "tcr": [
+      "q",
+      "100.0 / megakelvin"
+     ],
+     "tolerance": 0.05
+    },
+    "provider_ref": "C1469"
+   },
+   "payload": {
+    "v": 1,
+    "datasheet": "https://www.lcsc.com/datasheet/lcsc_datasheet_2206010230_UNI-ROYAL-Uniroyal-Elec-1206W4J0102T5E_C1469.pdf",
+    "description": "-55\u2103~+155\u2103 1k\u03a9 200V 250mW Thick Film Resistor \u00b1100ppm/\u2103 \u00b15% 1206 Chip Resistor - Surface Mount ROHS",
+    "stock": 170599,
+    "price": 0.0019,
+    "min_order_qty": 1,
+    "min_assembly_qty": 15,
+    "product_url": "https://jlcpcb.com/partdetail/C1469"
+   }
   }
  ]
 }
