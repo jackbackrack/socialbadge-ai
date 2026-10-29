@@ -8,6 +8,7 @@ import jitx
 from jitx import PadMapping
 from jitx.feature import Courtyard, Custom, Cutout, Paste, Silkscreen, Soldermask
 from jitx.landpattern import Landpattern, Pad
+from jitx.layerindex import Side
 from jitx.net import Port
 from jitx.shapes.composites import capsule, rectangle
 from jitx.shapes.primitive import Arc, ArcPolyline, Circle, Polyline, Text
@@ -45,18 +46,24 @@ class Pad4(Pad):
     """Through-hole pad."""
     shape = capsule(1.2, 1.8)
     cutout = Cutout(capsule(0.8, 1.4))
+    soldermask = Soldermask(capsule(1.2, 1.8), Side.Top)
+    soldermask_bottom = Soldermask(capsule(1.2, 1.8), Side.Bottom)
 
 
 class Pad5(Pad):
     """Through-hole pad."""
     shape = capsule(1.2, 2)
     cutout = Cutout(capsule(0.8, 1.6))
+    soldermask = Soldermask(capsule(1.2, 2), Side.Top)
+    soldermask_bottom = Soldermask(capsule(1.2, 2), Side.Bottom)
 
 
 class Pad6(Pad):
     """Through-hole pad."""
     shape = Circle(radius=0.375)
     cutout = Cutout(Circle(radius=0.375))
+    soldermask = Soldermask(Circle(radius=0.375), Side.Top)
+    soldermask_bottom = Soldermask(Circle(radius=0.375), Side.Bottom)
 
 
 # ======================================================================

@@ -13,6 +13,11 @@ from .hroparts_TYPE_C_31_M_12 import TYPE_C_31_M_12
 
 BOARD_SHAPE = rectangle(10.94, 9.35, radius=0.25)
 
+# Same not-quite-180 angle J1 has on the full badge board; a non-multiple of
+# 90 makes the gerber exporter emit the capsule pads as a rotated aperture
+# macro instead of a standard obround.
+DUT_ROTATION = -179.99998474121094
+
 
 class TestUSBCBoard(Board):
     """10.94 x 9.35 mm board -- just big enough for the USB-C connector's
@@ -24,7 +29,7 @@ class TestUSBCBoard(Board):
 class TestUSBCCircuit(Circuit):
     def __init__(self):
         self.dut = TYPE_C_31_M_12()
-        self.place(self.dut, Placement((0.0, 0.0)))
+        self.place(self.dut, Placement((0.0, 0.0), rotate=DUT_ROTATION))
 
 
 class TestDesign(Design):
