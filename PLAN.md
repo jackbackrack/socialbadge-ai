@@ -190,3 +190,90 @@ Deferred. Plan a separate session once Phase 2 circuits all build clean.
 2. **Charge current target** — 500 mA default OK or different value?
 3. **Status/charge LED** — include in plan or skip?
 4. **Crystal CL caps** — accept 15 pF default or read from Huiyuan datasheet first?
+
+---
+
+# Rev 2 (2026-11-04): front LEDs + sensors, 50 × 50 mm, electronics on the back
+
+Rev 1 (40 × 40 mm, everything on Top) was fabbed 2026-10-26 and brought up:
+USB, RP2040, flash, BOOTSEL programming, D4–D6 and the MCP73831 charger all
+work. Rev 2 adds back the LEDs and sensors from `~/py_social_badge` (only
+those — the rest of that design never worked) and moves all current
+circuitry to the back.
+
+## User decisions (2026-11-04)
+
+- Board **50 × 50 mm** (the `~/py_social_badge` size), same JLC04161H_1080 stackup.
+- **Front (Top):** 4 × 4 daisy-chained addressable LED grid (11.5 mm pitch, as
+  in py_social_badge), IR transmitter, IR receiver, ToF distance sensor.
+- **Back (Bottom):** everything already on the board (USB-C, charger, power
+  path, LDO, RP2040 + flash + crystal + buttons, battery connector, test
+  points) plus the new support parts.
+- LED chain powered from **switched VBAT** (P-FET high-side switch the
+  RP2040 turns on), so the LEDs' idle current can be cut on battery.
+- Keep D4–D6 and the charge LED D1, on the back.
+- LED part: user chose WS2812B-2020, but it has **zero JLCPCB stock**
+  (C965555). Substituted the same-protocol, same-size **WS2812C-2020-V6**
+  (C55160508, 2 400 in stock): VDD 3.3–5.3 V, VIH = 0.55·VDD, so it runs
+  straight from VBAT and takes 3.3 V data with no level shifter.
+
+## Data sources
+
+| Part | MPN | LCSC | Package | Datasheet | Footprint |
+|---|---|---|---|---|---|
+| Addressable RGB LED ×16 | WS2812C-2020-V6 | C55160508 | 2020 4-pad | datasheets/ws2812c-2020-v6.pdf | LCSC .kicad_mod (same consent as rev 1) |
+| IR emitter 940 nm | IR11-21C/TR8 | C19269752 | 1206-style 2-pad | Everlight (LCSC) | LCSC .kicad_mod |
+| IR receiver 38 kHz | IRM-H638T/TR2 | C91447 | 4-pad SMD | Everlight (LCSC) | LCSC .kicad_mod |
+| ToF distance sensor | VL53L0CXV0DH/1 | C91199 | LGA-12 optical | ST (LCSC) | LCSC .kicad_mod |
+| LED-rail P-FET | AO3401A | C15127 (Basic) | SOT-23 | AOS (LCSC) | JITX SOT-23 generator |
+| Gate / IR-LED driver N-FET ×2 | BSS138-7-F | C40912 | SOT-23 | Diodes (LCSC) | JITX SOT-23 generator |
+| Passives | — | — | 0402 | — | jitxlib.parts query |
+
+## Tasks
+
+- [r2-comp-01] WS2812C-2020-V6 component — done (`components/leds/worldsemi_WS2812C_2020.py`; pads checked against datasheet top view: rotated 180°, not mirrored)
+- [r2-comp-02] IR11-21C/TR8 component — done (`components/leds/everlight_IR11_21C.py`)
+- [r2-comp-03] IRM-H638T/TR2 component — done (`components/sensors/everlight_IRM_H638T.py`; pins 1–2 GND, 3 OUT, 4 VCC per datasheet)
+- [r2-comp-04] VL53L0CXV0DH/1 component — done (`components/sensors/st_VL53L0X.py`; ports renamed to ST names; pad order checked against the datasheet's bottom-view pinout, not mirrored)
+- [r2-comp-05] AO3401A, BSS138 components — done (`components/transistors/`; LCSC footprints rather than the SOT-23 generator, pad positions match standard SOT-23 G/S/D)
+- [r2-cir-01] `FrontLEDs`: 16-LED chain, 100 nF per LED, bulk cap, AO3401A
+  high-side switch (gate pulled to VBAT, BSS138 pull-down from GPIO, gate
+  pull-down so it boots off), series resistor on DIN — done (`circuits/front_leds.py`; bulk cap 4.7 µF, as 10 µF/10 V X5R ≤0805 is not stocked)
+- [r2-cir-02] `IRTransmitter`: BSS138 low-side switch from a PWM pin, current
+  resistor from 3V3 — done (`circuits/infrared.py`, 47 Ω 0603 ≈ 42 mA)
+- [r2-cir-03] `IRReceiver`: 3V3 supply with the datasheet RC filter, output to
+  a GPIO (rev-0 design fed it 4.2 V, which would over-drive the GPIO) — done (`circuits/infrared.py`)
+- [r2-cir-04] `DistanceSensor`: VL53L0X on 3V3, I²C pull-ups to 3V3, XSHUT
+  pull-up + GPIO, GPIO1 interrupt + pull-up — done (`circuits/distance_sensor.py`)
+- [r2-top-01] Top level: 50 × 50 mm outline, wire GPIOs, put the new
+  circuits on Top and everything else on Bottom, re-seat edge parts (USB-C,
+  battery) at the new edges — done: rev-1 parts moved to Bottom and +5 mm in y
+  in `jitx_export.json`; new parts given starting positions there; LED grid
+  placed in code; rev-1 routing (126 routes, 55 vias) deleted as stale
+- [r2-build-01] Build — done (status ok; 107 parts, 0 unplaced, no courtyard
+  overlaps or parts past the edge). Pending: routing, UI DRC, firmware for the
+  new peripherals
+- [r2-prot-01] USB-C ESD (USBLC6-2SC6 on D+/D−, PESD5V0S1BL on CC1/CC2,
+  copied from eink-placard) — done, at J1 on the back. No VBUS TVS (MCP73831
+  VDD abs max 7 V is below an SMF6.0A's ~10 V clamp)
+- [r2-prot-02] Reverse-battery AO3401A P-FET in the J2 + lead — done (112
+  parts, 0 unplaced, no courtyard overlaps or pads under 0.15 mm). AO3401A and
+  BSS138 courtyards grown to cover their pads
+- [r2-prot-03] USB D+/D−: 27 Ω series resistors moved into RP2040Support, at
+  U3's USB pads with ShortTraces. A 90 Ω diff-pair structure and length
+  matching were tried and then removed (2026-11-05): the RP2040 is 12 Mb/s
+  full speed and the ~25 mm path is electrically short. Route side by side
+  over GND. Inner planes swapped (L2 3V3, L3 GND) so the back references GND
+
+## GPIO map (RP2040)
+
+| GPIO | Use |
+|---|---|
+| 0–2 | Status LEDs D4–D6 (rev 1, unchanged) |
+| 4 / 5 | I²C0 SDA / SCL — VL53L0X |
+| 6 | IR transmitter (PWM3 A, 38 kHz carrier) |
+| 7 | IR receiver output |
+| 8 | VL53L0X XSHUT |
+| 9 | VL53L0X GPIO1 (interrupt) |
+| 10 | LED rail enable (high = on) |
+| 11 | LED chain data (PIO) |

@@ -13,14 +13,16 @@ Follows the RP2040 datasheet "Minimal Design Example" (Chapter 2.9):
 
 External interface:
 - v3v3 (Power)    — 3V3 supply
-- usb_dp, usb_dn  — to USB-C interface (post-27 Ω series resistors)
+- usb             — D+ (p) / D- (n) DiffPair from the USB-C interface. Each line
+                    ends at a 27 Ω series resistor (RP2040 hardware design guide)
+                    pinned by a ShortTrace to its USB pad
 - swclk, swd      — to debug header / test pads
 - gpio[0..29]     — passthrough for board-level connections
 """
 
 from jitx import Circuit, Net
 from jitx.common import Power
-from jitx.net import Port, ShortTrace
+from jitx.net import DiffPair, Port, ShortTrace
 from jitx.units import F, V, ohm
 from jitxlib.parts import Capacitor, Resistor
 
@@ -35,8 +37,7 @@ class RP2040Support(Circuit):
     """Complete RP2040 + flash + crystal + reset/boot buttons support circuit."""
 
     v3v3 = Power()
-    usb_dp = Port()
-    usb_dn = Port()
+    usb = DiffPair()
     swclk = Port()
     swd = Port()
     gpio = [Port() for _ in range(30)]
@@ -204,8 +205,12 @@ class RP2040Support(Circuit):
         ]
 
         # --- External passthroughs ---
-        self.usb_dp_net = [self.mcu.USB_DP + self.usb_dp]
-        self.usb_dn_net = [self.mcu.USB_DM + self.usb_dn]
+        self.r_usb_dp = Resistor(resistance=27.0 * ohm)
+        self.r_usb_dn = Resistor(resistance=27.0 * ohm)
+        self.usb_dp_net = [self.usb.p + self.r_usb_dp.p1]
+        self.usb_dn_net = [self.usb.n + self.r_usb_dn.p1]
+        self.st_r_usb_dp = ShortTrace(self.r_usb_dp.p2, self.mcu.USB_DP)
+        self.st_r_usb_dn = ShortTrace(self.r_usb_dn.p2, self.mcu.USB_DM)
         self.swclk_net = [self.mcu.SWCLK + self.swclk]
         self.swd_net = [self.mcu.SWD + self.swd]
         self.gpio_passthrough = [self.mcu.GPIO[i] + self.gpio[i] for i in range(30)]

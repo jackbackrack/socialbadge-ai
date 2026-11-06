@@ -75,3 +75,32 @@ Substrate selection (JLCPCB JLC04161H_1080 4-layer recommended) and main assembl
 - **TESTEN pin** must be tied to GND on the PCB (not just left floating).
 - **Crystal load caps** are 15 pF typical; HY12MSMD3225 datasheet should confirm CL — defer until datasheet read.
 - **Charge LED** = 0805 or 0603 generic red/green LED on MCP73831 STAT (open-drain to GND when charging) via current-limit resistor (1 kΩ on 3V3) — sourced from `jitxlib.parts` LED query.
+
+## Rev 2 additions (2026-11-04)
+
+Board grows to 50 × 50 mm. Front (Top): LED grid + sensors. Back (Bottom):
+everything else.
+
+| Block | File | Supply | RP2040 pins |
+|---|---|---|---|
+| `LEDGrid` — 16 × WS2812C-2020-V6, 4 × 4 at 11.5 mm, serpentine chain | `circuits/front_leds.py` | VLED | GPIO11 data (PIO) |
+| `LEDPower` — AO3401A high-side switch VBAT → VLED | `circuits/front_leds.py` | VBAT | GPIO10 enable (high = on) |
+| `IRTransmitter` — IR11-21C, BSS138 low-side, 47 Ω | `circuits/infrared.py` | 3V3 | GPIO6 (PWM3 A) |
+| `IRReceiver` — IRM-H638T 38 kHz, 100 Ω / 4.7 µF filter | `circuits/infrared.py` | 3V3 | GPIO7 (active low) |
+| `DistanceSensor` — VL53L0X, 2.2 kΩ I²C pull-ups | `circuits/distance_sensor.py` | 3V3 | GPIO4 SDA, GPIO5 SCL (I2C0), GPIO8 XSHUT, GPIO9 INT |
+
+New domain **VLED** = VBAT through the AO3401A (3.0–4.2 V; ~4.2 V while
+charging). WS2812C-2020-V6 runs from 3.3 V and needs VIH ≥ 0.55·VDD, so the
+RP2040's 3.3 V data needs no level shifter. Worst case all-white is about
+16 × 15 mA = 240 mA from the battery.
+
+### Protection (2026-11-05)
+
+| Block | Parts | Notes |
+|---|---|---|
+| USB-C ESD — `circuits/usb_c.py` | USBLC6-2SC6 (C7519) on D+/D−; PESD5V0S1BL (C84374) on CC1, CC2 | Copied from eink-placard. D+/D− run *through* the USBLC6 (connector → pins 3/1, pins 4/6 → 27 Ω). 100 nF on its VBUS pin. No VBUS TVS: a 6 V SMF clamps at ~10 V, above the MCP73831's 7 V VDD abs max. |
+| Reverse battery — `designs/badge_main.py` | AO3401A P-FET in the battery + lead | Drain to J2 pin 1 (`BAT_P`), source to VBAT, gate to GND. Blocks a reversed pack; ~30 mV drop at 500 mA. With USB present the charger can turn it on and trickle its pre-charge current into a reversed pack. |
+| USB D+/D− — `circuits/usb_c.py`, `circuits/rp2040_support.py` | no routing structure or length matching | The RP2040 is USB 1.1 full speed (12 Mb/s); the ~25 mm path is electrically short, so D+/D− are plain traces routed side by side over L3 GND. The 27 Ω series resistors (`RP2040Support.r_usb_dp/dn`) sit at U3's USB pads, each pinned by a `ShortTrace`. |
+
+Inner planes swapped in rev 2: L2 (layer 1) is now 3V3 and L3 (layer 2) GND,
+so the back, where the USB lines and nearly all the circuitry are, sits on GND.

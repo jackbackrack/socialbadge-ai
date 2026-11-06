@@ -342,6 +342,126 @@
    }
   },
   {
+   "digest": "3e4cc945eb353834f392c75845347dd4f6fe4cb4f5296050351def8e930689bb",
+   "chain": "jlcpcb",
+   "lock_scope": "",
+   "query": "capacitor(capacitance=1e-07 farad, case=OneOf(0402, 0603, 0805), rank=(min(case)))",
+   "filters": {
+    "capacitance": [
+     "Exactly",
+     [
+      "q",
+      "1e-07 farad"
+     ]
+    ],
+    "case": [
+     "OneOf",
+     [
+      "0402",
+      "0603",
+      "0805"
+     ]
+    ]
+   },
+   "provider": "jlcpcb",
+   "identity": {
+    "mpn": "CL05B104KO5NNNC",
+    "manufacturer": "Samsung Electro-Mechanics",
+    "category": "capacitor",
+    "provider": "jlcpcb",
+    "attributes": {
+     "capacitance": [
+      "q",
+      "100.0 nanofarad"
+     ],
+     "case": "0402",
+     "lcsc": "C1525",
+     "library": "basic",
+     "rated_voltage": [
+      "q",
+      "16.0 volt"
+     ],
+     "temperature_coefficient_code": "X7R",
+     "tolerance": 0.1
+    },
+    "provider_ref": "C1525"
+   },
+   "payload": {
+    "v": 1,
+    "datasheet": "https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL05B104KO5NNNC_C1525.pdf",
+    "description": "100nF 16V X7R \u00b110% 0402 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS",
+    "stock": 33158984,
+    "price": 0.0016,
+    "min_order_qty": 1,
+    "min_assembly_qty": 20,
+    "product_url": "https://jlcpcb.com/partdetail/C1525"
+   }
+  },
+  {
+   "digest": "d902d6f9f4305c7096d3ea18fc1e1b7824f999466cf19c13580344db5f49a17e",
+   "chain": "jlcpcb",
+   "lock_scope": "",
+   "query": "resistor(case=OneOf(0402, 0603, 0805), resistance=100.0 ohm, rank=(min(case)))",
+   "filters": {
+    "case": [
+     "OneOf",
+     [
+      "0402",
+      "0603",
+      "0805"
+     ]
+    ],
+    "resistance": [
+     "Exactly",
+     [
+      "q",
+      "100.0 ohm"
+     ]
+    ]
+   },
+   "provider": "jlcpcb",
+   "identity": {
+    "mpn": "0402WGF1000TCE",
+    "manufacturer": "UNI-ROYAL(Uniroyal Elec)",
+    "category": "resistor",
+    "provider": "jlcpcb",
+    "attributes": {
+     "case": "0402",
+     "composition": "Thick Film Resistor",
+     "lcsc": "C25076",
+     "library": "basic",
+     "max_power": [
+      "q",
+      "62.5 milliwatt"
+     ],
+     "rated_voltage": [
+      "q",
+      "50.0 volt"
+     ],
+     "resistance": [
+      "q",
+      "100.0 ohm"
+     ],
+     "tcr": [
+      "q",
+      "100.0 / megakelvin"
+     ],
+     "tolerance": 0.01
+    },
+    "provider_ref": "C25076"
+   },
+   "payload": {
+    "v": 1,
+    "datasheet": "https://www.lcsc.com/datasheet/lcsc_datasheet_2205311900_UNI-ROYAL-Uniroyal-Elec-0402WGF1000TCE_C25076.pdf",
+    "description": "-55\u2103~+155\u2103 100\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+    "stock": 11917929,
+    "price": 0.0007,
+    "min_order_qty": 1,
+    "min_assembly_qty": 20,
+    "product_url": "https://jlcpcb.com/partdetail/C25076"
+   }
+  },
+  {
    "digest": "f70c110f5f27db59e47f1b6a4b64db0220ff1a51ceee86c15fe6d7286fa41545",
    "chain": "jlcpcb",
    "lock_scope": "",
@@ -470,6 +590,70 @@
    }
   },
   {
+   "digest": "d78a2d6f1b050f9fde9247d97d07ef12395a28371930acb66639a0cc3265dbcd",
+   "chain": "jlcpcb",
+   "lock_scope": "",
+   "query": "resistor(case=OneOf(0402, 0603, 0805), resistance=2200.0 ohm, rank=(min(case)))",
+   "filters": {
+    "case": [
+     "OneOf",
+     [
+      "0402",
+      "0603",
+      "0805"
+     ]
+    ],
+    "resistance": [
+     "Exactly",
+     [
+      "q",
+      "2200.0 ohm"
+     ]
+    ]
+   },
+   "provider": "jlcpcb",
+   "identity": {
+    "mpn": "0402WGF2201TCE",
+    "manufacturer": "UNI-ROYAL(Uniroyal Elec)",
+    "category": "resistor",
+    "provider": "jlcpcb",
+    "attributes": {
+     "case": "0402",
+     "composition": "Thick Film Resistor",
+     "lcsc": "C25879",
+     "library": "basic",
+     "max_power": [
+      "q",
+      "62.5 milliwatt"
+     ],
+     "rated_voltage": [
+      "q",
+      "50.0 volt"
+     ],
+     "resistance": [
+      "q",
+      "2.2 kiloohm"
+     ],
+     "tcr": [
+      "q",
+      "100.0 / megakelvin"
+     ],
+     "tolerance": 0.01
+    },
+    "provider_ref": "C25879"
+   },
+   "payload": {
+    "v": 1,
+    "datasheet": "https://www.lcsc.com/datasheet/lcsc_datasheet_2206010045_UNI-ROYAL-Uniroyal-Elec-0402WGF2201TCE_C25879.pdf",
+    "description": "-55\u2103~+155\u2103 2.2k\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+    "stock": 3458078,
+    "price": 0.0006,
+    "min_order_qty": 1,
+    "min_assembly_qty": 20,
+    "product_url": "https://jlcpcb.com/partdetail/C25879"
+   }
+  },
+  {
    "digest": "34c4093a8ac64dc7b8b89c0cfd99b2c38bff94fff0aa61c9ba455c44759ccb29",
    "chain": "jlcpcb",
    "lock_scope": "",
@@ -531,6 +715,70 @@
     "min_order_qty": 1,
     "min_assembly_qty": 20,
     "product_url": "https://jlcpcb.com/partdetail/C25100"
+   }
+  },
+  {
+   "digest": "ed6f5c284dcd752ae29e27791845f5aba56bcd898abec96628e795881f8a4592",
+   "chain": "jlcpcb",
+   "lock_scope": "",
+   "query": "resistor(case=OneOf(0402, 0603, 0805), resistance=33.0 ohm, rank=(min(case)))",
+   "filters": {
+    "case": [
+     "OneOf",
+     [
+      "0402",
+      "0603",
+      "0805"
+     ]
+    ],
+    "resistance": [
+     "Exactly",
+     [
+      "q",
+      "33.0 ohm"
+     ]
+    ]
+   },
+   "provider": "jlcpcb",
+   "identity": {
+    "mpn": "0402WGF330JTCE",
+    "manufacturer": "UNI-ROYAL(Uniroyal Elec)",
+    "category": "resistor",
+    "provider": "jlcpcb",
+    "attributes": {
+     "case": "0402",
+     "composition": "Thick Film Resistor",
+     "lcsc": "C25105",
+     "library": "basic",
+     "max_power": [
+      "q",
+      "62.5 milliwatt"
+     ],
+     "rated_voltage": [
+      "q",
+      "50.0 volt"
+     ],
+     "resistance": [
+      "q",
+      "33.0 ohm"
+     ],
+     "tcr": [
+      "q",
+      "100.0 / megakelvin"
+     ],
+     "tolerance": 0.01
+    },
+    "provider_ref": "C25105"
+   },
+   "payload": {
+    "v": 1,
+    "datasheet": "https://www.lcsc.com/datasheet/lcsc_datasheet_2205311900_UNI-ROYAL-Uniroyal-Elec-0402WGF330JTCE_C25105.pdf",
+    "description": "-55\u2103~+155\u2103 33\u03a9 50V 62.5mW Thick Film Resistor \u00b11% \u00b1100ppm/\u2103 0402 Chip Resistor - Surface Mount ROHS",
+    "stock": 3876499,
+    "price": 0.0007,
+    "min_order_qty": 1,
+    "min_assembly_qty": 20,
+    "product_url": "https://jlcpcb.com/partdetail/C25105"
    }
   },
   {
@@ -662,6 +910,70 @@
    }
   },
   {
+   "digest": "9b41304a62f0b1bb1b2ce963958ecb2460f7d007b49c0a72c767df9ae82c9b25",
+   "chain": "jlcpcb",
+   "lock_scope": "",
+   "query": "resistor(case=OneOf(0402, 0603, 0805), resistance=100000.0 ohm, rank=(min(case)))",
+   "filters": {
+    "case": [
+     "OneOf",
+     [
+      "0402",
+      "0603",
+      "0805"
+     ]
+    ],
+    "resistance": [
+     "Exactly",
+     [
+      "q",
+      "100000.0 ohm"
+     ]
+    ]
+   },
+   "provider": "jlcpcb",
+   "identity": {
+    "mpn": "0402WGJ0104TCE",
+    "manufacturer": "UNI-ROYAL(Uniroyal Elec)",
+    "category": "resistor",
+    "provider": "jlcpcb",
+    "attributes": {
+     "case": "0402",
+     "composition": "Thick Film Resistor",
+     "lcsc": "C25530",
+     "library": "extended",
+     "max_power": [
+      "q",
+      "62.5 milliwatt"
+     ],
+     "rated_voltage": [
+      "q",
+      "50.0 volt"
+     ],
+     "resistance": [
+      "q",
+      "100.0 kiloohm"
+     ],
+     "tcr": [
+      "q",
+      "100.0 / megakelvin"
+     ],
+     "tolerance": 0.05
+    },
+    "provider_ref": "C25530"
+   },
+   "payload": {
+    "v": 1,
+    "datasheet": "https://www.lcsc.com/datasheet/lcsc_datasheet_2205311845_UNI-ROYAL-Uniroyal-Elec-0402WGJ0104TCE_C25530.pdf",
+    "description": "-55\u2103~+155\u2103 100k\u03a9 50V 62.5mW Thick Film Resistor \u00b1100ppm/\u2103 \u00b15% 0402 Chip Resistor - Surface Mount ROHS",
+    "stock": 10073314,
+    "price": 0.0005,
+    "min_order_qty": 1,
+    "min_assembly_qty": 20,
+    "product_url": "https://jlcpcb.com/partdetail/C25530"
+   }
+  },
+  {
    "digest": "9dcef009a5782d151c8df0fdf15908880c9444e57e50e91ed5ce97895df61888",
    "chain": "jlcpcb",
    "lock_scope": "",
@@ -723,6 +1035,68 @@
     "min_order_qty": 1,
     "min_assembly_qty": 20,
     "product_url": "https://jlcpcb.com/partdetail/C12246"
+   }
+  },
+  {
+   "digest": "b6995499e4c353f75d2ad3ed64d01b4d4130b3f2d9d80e5fa1612a1107e452e1",
+   "chain": "jlcpcb",
+   "lock_scope": "",
+   "query": "resistor(case=OneOf(0603), resistance=47.0 ohm)",
+   "filters": {
+    "case": [
+     "OneOf",
+     [
+      "0603"
+     ]
+    ],
+    "resistance": [
+     "Exactly",
+     [
+      "q",
+      "47.0 ohm"
+     ]
+    ]
+   },
+   "provider": "jlcpcb",
+   "identity": {
+    "mpn": "0603WAJ0470T5E",
+    "manufacturer": "UNI-ROYAL(Uniroyal Elec)",
+    "category": "resistor",
+    "provider": "jlcpcb",
+    "attributes": {
+     "case": "0603",
+     "composition": "Thick Film Resistor",
+     "lcsc": "C1211",
+     "library": "extended",
+     "max_power": [
+      "q",
+      "100.0 milliwatt"
+     ],
+     "rated_voltage": [
+      "q",
+      "75.0 volt"
+     ],
+     "resistance": [
+      "q",
+      "47.0 ohm"
+     ],
+     "tcr": [
+      "q",
+      "100.0 / megakelvin"
+     ],
+     "tolerance": 0.05
+    },
+    "provider_ref": "C1211"
+   },
+   "payload": {
+    "v": 1,
+    "datasheet": "https://www.lcsc.com/datasheet/lcsc_datasheet_2206010230_UNI-ROYAL-Uniroyal-Elec-0603WAJ0470T5E_C1211.pdf",
+    "description": "-55\u2103~+155\u2103 100mW 47\u03a9 75V Thick Film Resistor \u00b1100ppm/\u2103 \u00b15% 0603 Chip Resistor - Surface Mount ROHS",
+    "stock": 306622,
+    "price": 0.0015,
+    "min_order_qty": 1,
+    "min_assembly_qty": 20,
+    "product_url": "https://jlcpcb.com/partdetail/C1211"
    }
   },
   {
