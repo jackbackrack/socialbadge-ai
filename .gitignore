@@ -13,3 +13,7 @@ lcsc.lock.json
 /autosave/
 /designs.bak/
 /parts-db/
+
+# Pico SDK firmware build output
+/firmware/*/build/
+/firmware/*/build.log

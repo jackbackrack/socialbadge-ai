@@ -1,0 +1,20 @@
+; WS2812 bit encoder, as in pico-examples (pio/ws2812): 10 PIO cycles per bit
+; at 800 kHz. The pin idles low (the `out` stalls with side-set 0), which is
+; what keeps LED_DATA low while the grid's power is off.
+
+.program ws2812
+.side_set 1
+
+.define public T1 3
+.define public T2 3
+.define public T3 4
+
+.wrap_target
+bitloop:
+    out x, 1       side 0 [T3 - 1] ; side-set still takes place when instruction stalls
+    jmp !x do_zero side 1 [T1 - 1] ; branch on the bit we shifted out. Positive pulse
+do_one:
+    jmp  bitloop   side 1 [T2 - 1] ; continue driving high, for a long pulse
+do_zero:
+    nop            side 0 [T2 - 1] ; or drive low, for a short pulse
+.wrap
