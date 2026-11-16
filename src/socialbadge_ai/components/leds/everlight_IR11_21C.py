@@ -2,6 +2,14 @@
 940 nm infrared emitting diode
 
 Auto-generated from KiCad footprint: easyeda2kicad:LED1206-R-RD_RED
+
+Pad 1 here is the cathode and pad 2 the anode, the reverse of the datasheet
+(pin 1 anode, pin 2 cathode) and of the EasyEDA footprint JLCPCB places from.
+The board was laid out against this numbering, so rather than renumber the
+pads the part is turned instead: lcsc.lock.json gives it orientation 180, which
+puts the reel part's anode on pad 2, and the silkscreen (polarity triangle,
+chamfered cathode end, pin-1 dot) is mirrored from the KiCad import's to
+match, so it shows the cathode at pad 1.
 """
 
 import jitx
@@ -52,19 +60,19 @@ class _Landpattern(Landpattern):
     reference_designator = Silkscreen(Text(">REF", 1, Anchor.W).at((0, 4)))
     value_label = Custom(Text(">VALUE", 1, Anchor.W).at((0, -4)), name="Fab")
     silkscreen = [
-        Silkscreen(Polyline(0.25, [(0.38, 0.63), (0.38, -0.63)])),
-        Silkscreen(Polyline(0.25, [(0.38, -0.63), (0.38, 0.63)])),
-        Silkscreen(Polyline(0.25, [(0.38, 0.63), (-0.51, -0)])),
-        Silkscreen(Polyline(0.25, [(-0.51, -0), (0.38, -0.63)])),
-        Silkscreen(Polyline(0.15, [(0.83, -1.04), (2.46, -1.04)])),
-        Silkscreen(Polyline(0.15, [(2.46, -1.04), (2.46, 1.04)])),
-        Silkscreen(Polyline(0.15, [(2.46, 1.04), (0.83, 1.04)])),
-        Silkscreen(Polyline(0.15, [(-0.83, -1.04), (-2.31, -1.04)])),
-        Silkscreen(Polyline(0.15, [(-2.31, -1.04), (-2.46, -0.89)])),
-        Silkscreen(Polyline(0.15, [(-2.46, -0.89), (-2.46, 0.89)])),
-        Silkscreen(Polyline(0.15, [(-2.46, 0.89), (-2.31, 1.04)])),
-        Silkscreen(Polyline(0.15, [(-2.31, 1.04), (-0.83, 1.04)])),
-        Silkscreen(ArcPolyline(0.06, [Arc((1.5, 0.75), 0.03, 0, -360)])),
+        Silkscreen(Polyline(0.25, [(-0.38, 0.63), (-0.38, -0.63)])),
+        Silkscreen(Polyline(0.25, [(-0.38, -0.63), (-0.38, 0.63)])),
+        Silkscreen(Polyline(0.25, [(-0.38, 0.63), (0.51, -0)])),
+        Silkscreen(Polyline(0.25, [(0.51, -0), (-0.38, -0.63)])),
+        Silkscreen(Polyline(0.15, [(-0.83, -1.04), (-2.46, -1.04)])),
+        Silkscreen(Polyline(0.15, [(-2.46, -1.04), (-2.46, 1.04)])),
+        Silkscreen(Polyline(0.15, [(-2.46, 1.04), (-0.83, 1.04)])),
+        Silkscreen(Polyline(0.15, [(0.83, -1.04), (2.31, -1.04)])),
+        Silkscreen(Polyline(0.15, [(2.31, -1.04), (2.46, -0.89)])),
+        Silkscreen(Polyline(0.15, [(2.46, -0.89), (2.46, 0.89)])),
+        Silkscreen(Polyline(0.15, [(2.46, 0.89), (2.31, 1.04)])),
+        Silkscreen(Polyline(0.15, [(2.31, 1.04), (0.83, 1.04)])),
+        Silkscreen(ArcPolyline(0.06, [Arc((-1.5, 0.75), 0.03, 0, -360)])),
     ]
     courtyard = Courtyard(rectangle(3, 1.5))
 

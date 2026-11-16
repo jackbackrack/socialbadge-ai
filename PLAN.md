@@ -224,7 +224,7 @@ circuitry to the back.
 | Addressable RGB LED ×16 | WS2812C-2020-V6 | C55160508 | 2020 4-pad | datasheets/ws2812c-2020-v6.pdf | LCSC .kicad_mod (same consent as rev 1) |
 | IR emitter 940 nm | IR11-21C/TR8 | C19269752 | 1206-style 2-pad | Everlight (LCSC) | LCSC .kicad_mod |
 | IR receiver 38 kHz | IRM-H638T/TR2 | C91447 | 4-pad SMD | Everlight (LCSC) | LCSC .kicad_mod |
-| ToF distance sensor | VL53L0CXV0DH/1 | C91199 | LGA-12 optical | ST (LCSC) | LCSC .kicad_mod |
+| ToF distance sensor | VL53L4CDV0DH/1 (was VL53L0CXV0DH/1, C91199) | C3178291 | LGA-12 optical | ST (LCSC) | datasheet DS13812 |
 | LED-rail P-FET | AO3401A | C15127 (Basic) | SOT-23 | AOS (LCSC) | JITX SOT-23 generator |
 | Gate / IR-LED driver N-FET ×2 | BSS138-7-F | C40912 | SOT-23 | Diodes (LCSC) | JITX SOT-23 generator |
 | Passives | — | — | 0402 | — | jitxlib.parts query |
@@ -235,6 +235,7 @@ circuitry to the back.
 - [r2-comp-02] IR11-21C/TR8 component — done (`components/leds/everlight_IR11_21C.py`)
 - [r2-comp-03] IRM-H638T/TR2 component — done (`components/sensors/everlight_IRM_H638T.py`; pins 1–2 GND, 3 OUT, 4 VCC per datasheet)
 - [r2-comp-04] VL53L0CXV0DH/1 component — done (`components/sensors/st_VL53L0X.py`; ports renamed to ST names; pad order checked against the datasheet's bottom-view pinout, not mirrored)
+- [r2-comp-04b] VL53L4CDV0DH/1 replaces it (C91199 out of stock at JLCPCB, 2026-11-05) — done (`components/sensors/st_VL53L4CD.py`; pin-compatible, keeps the VL53L0X pad keys so the pushed routes stay on their pins; orientation 0 in lcsc.lock.json). Firmware needs ST's VL53L4CD ULD driver, not VL53L0X code.
 - [r2-comp-05] AO3401A, BSS138 components — done (`components/transistors/`; LCSC footprints rather than the SOT-23 generator, pad positions match standard SOT-23 G/S/D)
 - [r2-cir-01] `FrontLEDs`: 16-LED chain, 100 nF per LED, bulk cap, AO3401A
   high-side switch (gate pulled to VBAT, BSS138 pull-down from GPIO, gate

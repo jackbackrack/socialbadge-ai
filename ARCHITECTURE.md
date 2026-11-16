@@ -87,7 +87,7 @@ everything else.
 | `LEDPower` — AO3401A high-side switch VBAT → VLED | `circuits/front_leds.py` | VBAT | GPIO10 enable (high = on) |
 | `IRTransmitter` — IR11-21C, BSS138 low-side, 47 Ω | `circuits/infrared.py` | 3V3 | GPIO6 (PWM3 A) |
 | `IRReceiver` — IRM-H638T 38 kHz, 100 Ω / 4.7 µF filter | `circuits/infrared.py` | 3V3 | GPIO7 (active low) |
-| `DistanceSensor` — VL53L0X, 2.2 kΩ I²C pull-ups | `circuits/distance_sensor.py` | 3V3 | GPIO4 SDA, GPIO5 SCL (I2C0), GPIO8 XSHUT, GPIO9 INT |
+| `DistanceSensor` — VL53L4CD (was VL53L0X, out of stock), 2.2 kΩ I²C pull-ups | `circuits/distance_sensor.py` | 3V3 | GPIO4 SDA, GPIO5 SCL (I2C0), GPIO8 XSHUT, GPIO9 INT |
 
 New domain **VLED** = VBAT through the AO3401A (3.0–4.2 V; ~4.2 V while
 charging). WS2812C-2020-V6 runs from 3.3 V and needs VIH ≥ 0.55·VDD, so the
