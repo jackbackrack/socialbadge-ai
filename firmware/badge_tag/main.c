@@ -4,14 +4,17 @@
 // of the grid -- read like text, top left = 1, bottom right = 16 -- and the
 // hue (k - 1) * 22.5 degrees at full saturation.
 //
-//   - Its own LED breathes slowly in its own colour.
+//   - Its own LED is the brightest, pulsing once a second in its own colour.
 //   - Every 300..700 ms (random, so two badges don't keep colliding) it sends
 //     its ID as an NEC infrared frame: address BADGE_MAGIC, command = ID.
-//   - While it hears another badge j, LED j blinks in colour j, and the other
-//     14 LEDs count down: all lit dimly in colour j, going out one by one.
+//   - While it hears another badge j, LED j blinks fast and bright in colour j
+//     (so j's owner sees they're being called), and the other 14 LEDs count
+//     down: all lit dimly in colour j, going out one by one.
 //   - Heard for TAG_FREEZE_S without a gap longer than TAG_GAP_MS, LED j is
 //     frozen: the grid flashes colour j three times, then LED j pulses slowly
-//     while badge j is still here and stays solid once it's gone; kept in flash.
+//     and dimly while badge j is still here, and stays dim and steady once
+//     it's gone. Frozen LEDs live only in RAM: power off (or reset) and only
+//     the badge's own LED is left.
 //
 // "Close enough" is set by the IR power (the carrier's duty cycle; the LED
 // current itself is fixed by its 47 Ohm resistor): turned down so that
@@ -63,7 +66,7 @@
 
 #define TAG_HEARD_MS 1500        // "hearing" a badge: a frame within this long
 #define TAG_GAP_MS 3000          // a longer silence restarts the freeze count
-#define TAG_FREEZE_S 60          // heard this long without such a gap: frozen
+#define TAG_FREEZE_S 10          // heard this long without such a gap: frozen
 
 // ------------------------------------------------------------------ storage
 //
@@ -77,14 +80,18 @@ typedef struct {
     uint32_t magic;
     uint8_t id;        // 0 = not set
     uint8_t power;     // percent
-    uint16_t frozen;   // bit k-1 = ID k frozen
+    uint16_t spare;    // was the frozen set, now kept in RAM only; written as 0
     uint32_t check;
 } store_t;
 
 static store_t store;
 
+// Badges collected (bit k-1 = ID k). Deliberately RAM only, never saved:
+// the collection starts empty at every power-up.
+static uint16_t frozen;
+
 static uint32_t store_check(const store_t *s) {
-    return s->magic ^ ((uint32_t)s->id << 24 | (uint32_t)s->power << 16 | s->frozen) ^ 0x5A5A5A5Au;
+    return s->magic ^ ((uint32_t)s->id << 24 | (uint32_t)s->power << 16 | s->spare) ^ 0x5A5A5A5Au;
 }
 
 static void store_load(void) {
@@ -93,11 +100,12 @@ static void store_load(void) {
         f->power <= POWER_MAX) {
         store = *f;
     } else {
-        store = (store_t){.magic = STORE_MAGIC, .id = 0, .power = POWER_DEFAULT, .frozen = 0};
+        store = (store_t){.magic = STORE_MAGIC, .id = 0, .power = POWER_DEFAULT, .spare = 0};
     }
 }
 
 static void store_save(void) {
+    store.spare = 0;
     store.check = store_check(&store);
     static uint8_t page[FLASH_PAGE_SIZE];
     memset(page, 0xFF, sizeof page);
@@ -332,9 +340,8 @@ static void on_heard(uint id, uint64_t now) {
     heard_last[id] = now;
     heard_frames[id]++;
     uint16_t bit = 1u << (id - 1);
-    if (!(store.frozen & bit) && now - heard_first[id] >= TAG_FREEZE_S * 1000000ull) {
-        store.frozen |= bit;
-        store_save();
+    if (!(frozen & bit) && now - heard_first[id] >= TAG_FREEZE_S * 1000000ull) {
+        frozen |= bit;
         freeze_id = id, freeze_at = now;
         printf("EVT frozen %u\n", id);
     }
@@ -353,6 +360,12 @@ static void check_gone(uint64_t now) {
 
 #define FLASH_US 1500000   // "got it" flash at the moment of freezing: the grid blinks 3 times
 #define COUNTDOWN_VALUE 40  // countdown LEDs, dimmer than the badge's own blinking LED
+// Three kinds of LED have to read apart at a glance:
+#define OWN_VALUE 200       // ours: brightest, pulsing at OWN_PULSE_S
+#define OWN_PULSE_S 1.0f
+#define CALL_VALUE 200      // a badge heard and not yet collected: bright, blinking at CALL_HZ,
+#define CALL_HZ 6           //   so its owner sees their colour flickering "come here"
+#define GOT_VALUE 35        // collected: dim and steady (slowly pulsing while that badge is here)
 
 static void render(uint64_t now) {
     uint32_t frame[N_IDS] = {0};
@@ -372,21 +385,21 @@ static void render(uint64_t now) {
     // The badge whose freeze countdown is furthest along, if any is running.
     uint counting = 0;
     for (uint id = 1; id <= N_IDS; id++)
-        if (id != store.id && hearing(id, now) && heard_first[id] && !(store.frozen & (1u << (id - 1))) &&
+        if (id != store.id && hearing(id, now) && heard_first[id] && !(frozen & (1u << (id - 1))) &&
             (!counting || heard_first[id] < heard_first[counting]))
             counting = id;
 
-    bool blink_on = (now / 250000) % 2 == 0;                                     // 2 Hz: counting down
+    bool blink_on = (now / (500000 / CALL_HZ)) % 2 == 0;                          // fast: calling
     float slow = 0.3f + 0.7f * (0.5f - 0.5f * cosf(2.0f * (float)M_PI * t / 2.0f));  // 2 s: frozen and here
     for (uint id = 1; id <= N_IDS; id++) {
-        bool frozen = store.frozen & (1u << (id - 1));
+        bool got = frozen & (1u << (id - 1));
         uint32_t c = 0;
-        if (hearing(id, now) && !frozen)
-            c = blink_on ? hsv(id_hue(id), VALUE) : 0;
-        else if (hearing(id, now) && frozen)
-            c = hsv(id_hue(id), (uint8_t)(VALUE * slow * slow));
-        else if (frozen)
-            c = hsv(id_hue(id), VALUE);
+        if (hearing(id, now) && !got)
+            c = blink_on ? hsv(id_hue(id), CALL_VALUE) : 0;
+        else if (hearing(id, now) && got)
+            c = hsv(id_hue(id), (uint8_t)(GOT_VALUE * slow));
+        else if (got)
+            c = hsv(id_hue(id), GOT_VALUE);
         frame[id_led(id)] = c;
     }
 
@@ -401,9 +414,10 @@ static void render(uint64_t now) {
         for (uint k = 0; k < n; k++) frame[id_led(others[k])] = k < lit ? hsv(id_hue(counting), COUNTDOWN_VALUE) : 0;
     }
 
-    // our own LED breathes (3 s), so it reads apart from the rest
-    float breath = 0.25f + 0.75f * (0.5f - 0.5f * cosf(2.0f * (float)M_PI * t / 3.0f));
-    frame[id_led(store.id)] = hsv(id_hue(store.id), (uint8_t)(VALUE * breath * breath));
+    // our own LED: the brightest, pulsing once a second, so it reads apart
+    // from the dim steady collected ones and the fast-blinking callers
+    float breath = 0.15f + 0.85f * (0.5f - 0.5f * cosf(2.0f * (float)M_PI * t / OWN_PULSE_S));
+    frame[id_led(store.id)] = hsv(id_hue(store.id), (uint8_t)(OWN_VALUE * breath * breath));
     grid_show(frame);
 }
 
@@ -412,7 +426,7 @@ static void render(uint64_t now) {
 static void print_status(uint64_t now) {
     printf("STATUS id %u power %u%% frozen", store.id, store.power);
     for (uint id = 1; id <= N_IDS; id++)
-        if (store.frozen & (1u << (id - 1))) printf(" %u", id);
+        if (frozen & (1u << (id - 1))) printf(" %u", id);
     printf(" | hearing");
     for (uint id = 1; id <= N_IDS; id++)
         if (hearing(id, now))
@@ -460,8 +474,7 @@ static void command(char *line, uint64_t now) {
         store_save();
         printf("OK power %u%%\n", store.power);
     } else if (!strcmp(line, "clear")) {
-        store.frozen = 0;
-        store_save();
+        frozen = 0;
         printf("OK cleared\n");
     } else if (!strcmp(line, "status")) {
         print_status(now);
